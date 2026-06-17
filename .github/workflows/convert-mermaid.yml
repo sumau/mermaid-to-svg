@@ -26,10 +26,10 @@ jobs:
       run: npm install --no-save @mermaid-js/mermaid-cli
 
     - name: Convert Mermaid diagram to SVG
-      run: npx mmdc -i assets/diagram.mmd -o assets/diagram.svg
+      run: npx mmdc -i asssets/diagram.mmd -o asssets/diagram.svg
 
     - name: Upload SVG artifact
       uses: actions/upload-artifact@v4
       with:
         name: mermaid-svg
-        path: assets/diagram.svg
+        path: asssets/diagram.svg
