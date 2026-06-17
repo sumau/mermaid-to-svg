@@ -50,28 +50,14 @@ jobs:
           npx mmdc -p puppeteer-config.json -i "$file" -o "docs/generated/${base}.svg"
         done
 
-    - name: Debug git state
-      run: |
-        echo "Branch ref: $GITHUB_REF"
-        echo "Branch name: $GITHUB_REF_NAME"
-        git status --short
-        git diff --name-only
-        ls -R docs/generated || true
-    
     - name: Commit generated SVGs if changed
       run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-    
-        git add docs/generated
-    
-        echo "After git add:"
-        git status --short
-    
-        if git diff --cached --quiet; then
-          echo "No staged changes to commit"
-          exit 0
+        if ! git diff --quiet docs/generated; then
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/generated
+          git commit -m "Update generated Mermaid diagrams"
+          git push origin HEAD:${GITHUB_REF_NAME}
+        else
+          echo "No diagram changes to commit"
         fi
-    
-        git commit -m "Update generated Mermaid diagrams"
-        git push origin HEAD:${GITHUB_REF_NAME}
