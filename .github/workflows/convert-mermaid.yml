@@ -5,6 +5,7 @@ on:
     paths:
       - "mermaid/source/**/*.mmd"
       - "mermaid/source/**/*.mermaid"
+      - "mermaid/source/**/*.md"
       - ".github/workflows/convert-mermaid.yml"
   workflow_dispatch:
 
@@ -50,19 +51,22 @@ jobs:
         run: |
           mkdir -p "${MERMAID_OUTPUT_DIR}"
 
-          find "${MERMAID_SOURCE_DIR}" \( -name "*.mmd" -o -name "*.mermaid" \) | while read -r file; do
-            relative_path="${file#${MERMAID_SOURCE_DIR}/}"
-            output_file="${MERMAID_OUTPUT_DIR}/${relative_path%.*}.svg"
+          find "${MERMAID_SOURCE_DIR}" \
+            \( -name "*.mmd" -o -name "*.mermaid" -o -name "*.md" \) \
+            | while read -r file; do
 
-            mkdir -p "$(dirname "${output_file}")"
+              relative_path="${file#${MERMAID_SOURCE_DIR}/}"
+              output_file="${MERMAID_OUTPUT_DIR}/${relative_path%.*}.svg"
 
-            echo "Rendering ${file} -> ${output_file}"
+              mkdir -p "$(dirname "${output_file}")"
 
-            npx mmdc \
-              -p puppeteer-config.json \
-              -i "${file}" \
-              -o "${output_file}"
-          done
+              echo "Rendering ${file} -> ${output_file}"
+
+              npx mmdc \
+                -p puppeteer-config.json \
+                -i "${file}" \
+                -o "${output_file}"
+            done
 
       - name: Remove orphaned SVGs
         run: |
@@ -72,6 +76,7 @@ jobs:
               relative_path="${svg#${MERMAID_OUTPUT_DIR}/}"
               source_mmd="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.mmd"
               source_mermaid="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.mermaid"
+              source_md="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.md"
 
               if [ ! -f "${source_mmd}" ] && [ ! -f "${source_mermaid}" ]; then
                 echo "Removing orphaned SVG: ${svg}"
