@@ -1,12 +1,16 @@
-name: Convert mermaid diagrams to svg
+name: Convert Mermaid diagrams to SVG
 
 on:
   push:
     paths:
-      - "docs/**/*.mmd"
-      - "docs/**/*.mermaid"
+      - "docs/mermaid/**/*.mmd"
+      - "docs/mermaid/**/*.mermaid"
       - ".github/workflows/convert-mermaid.yml"
   workflow_dispatch:
+
+env:
+  MERMAID_SOURCE_DIR: docs/mermaid
+  MERMAID_OUTPUT_DIR: docs/generated
 
 permissions:
   contents: write
@@ -14,52 +18,62 @@ permissions:
 jobs:
   convert:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 22
+      - name: Install Mermaid CLI and Puppeteer
+        run: |
+          npm install --no-save @mermaid-js/mermaid-cli puppeteer
 
-    - name: Install Mermaid CLI and Puppeteer
-      run: npm install --no-save @mermaid-js/mermaid-cli puppeteer
+      - name: Create Puppeteer config
+        run: |
+          cat > puppeteer-config.json <<'EOF'
+          {
+            "args": [
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-dev-shm-usage"
+            ]
+          }
+          EOF
 
-    - name: Create Puppeteer config
-      run: |
-        cat > puppeteer-config.json <<'EOF'
-        {
-          "args": [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage"
-          ]
-        }
-        EOF
+      - name: Render all Mermaid diagrams
+        run: |
+          mkdir -p "${MERMAID_OUTPUT_DIR}"
 
-    - name: Render all Mermaid diagrams
-      run: |
-        mkdir -p docs/generated
-        find docs -name "*.mmd" | while read -r file; do
-          base="$(basename "$file" .mmd)"
-          npx mmdc -p puppeteer-config.json -i "$file" -o "docs/generated/${base}.svg"
-        done
+          find "${MERMAID_SOURCE_DIR}" \( -name "*.mmd" -o -name "*.mermaid" \) | while read -r file; do
+            relative_path="${file#${MERMAID_SOURCE_DIR}/}"
+            output_file="${MERMAID_OUTPUT_DIR}/${relative_path%.*}.svg"
 
-    - name: Commit generated SVGs if changed
-      run: |
-        
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add docs/generated
-    
-        if git diff --cached --quiet; then
-          echo "No diagram changes to commit"
-        else
-          git commit -m "Update generated Mermaid diagrams"
-          git push origin HEAD:${GITHUB_REF_NAME}
-        fi
+            mkdir -p "$(dirname "${output_file}")"
+
+            echo "Rendering ${file} -> ${output_file}"
+
+            npx mmdc \
+              -p puppeteer-config.json \
+              -i "${file}" \
+              -o "${output_file}"
+          done
+
+      - name: Commit generated SVGs if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add "${MERMAID_OUTPUT_DIR}"
+
+          if git diff --cached --quiet; then
+            echo "No diagram changes to commit"
+          else
+            git commit -m "Update generated Mermaid diagrams"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
