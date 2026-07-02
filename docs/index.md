@@ -2,4 +2,4 @@
 
 This is an example
 
-![](/docs/generated/branch.svg)
+![](/mermaid/generated/branch.svg)

@@ -1,4 +1,4 @@
 # test-mermaid
 
 
-![](docs/generated/diagram.svg)
+![](mermaid/generated/diagram.svg)

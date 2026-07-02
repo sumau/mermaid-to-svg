@@ -3,14 +3,14 @@ name: Convert Mermaid diagrams to SVG
 on:
   push:
     paths:
-      - "docs/mermaid/**/*.mmd"
-      - "docs/mermaid/**/*.mermaid"
+      - "mermaid/source/**/*.mmd"
+      - "mermaid/source/**/*.mermaid"
       - ".github/workflows/convert-mermaid.yml"
   workflow_dispatch:
 
 env:
-  MERMAID_SOURCE_DIR: docs/mermaid
-  MERMAID_OUTPUT_DIR: docs/generated
+  MERMAID_SOURCE_DIR: mermaid/source
+  MERMAID_OUTPUT_DIR: mermaid/generated
 
 permissions:
   contents: write
