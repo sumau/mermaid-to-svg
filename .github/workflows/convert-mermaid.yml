@@ -12,6 +12,7 @@ on:
 env:
   MERMAID_SOURCE_DIR: mermaid/source
   MERMAID_OUTPUT_DIR: mermaid/generated
+  MERMAID_TEMP_DIR: .mermaid-tmp
 
 permissions:
   contents: write
@@ -47,15 +48,62 @@ jobs:
           }
           EOF
 
-      - name: Render all Mermaid diagrams
+      - name: Extract first Mermaid code block from Markdown
+        run: |
+          rm -rf "${MERMAID_TEMP_DIR}"
+          mkdir -p "${MERMAID_TEMP_DIR}"
+
+          if ! find "${MERMAID_SOURCE_DIR}" -name "*.md" | grep -q .; then
+            echo "No .md files found in ${MERMAID_SOURCE_DIR}; skipping Markdown extraction"
+            exit 0
+          fi
+
+          find "${MERMAID_SOURCE_DIR}" -name "*.md" | while read -r file; do
+            relative_path="${file#${MERMAID_SOURCE_DIR}/}"
+            temp_file="${MERMAID_TEMP_DIR}/${relative_path%.md}.mmd"
+
+            mkdir -p "$(dirname "${temp_file}")"
+
+            awk '
+              BEGIN {
+                fence = sprintf("%c%c%c", 96, 96, 96)
+              }
+
+              $0 ~ "^[[:space:]]*" fence "mermaid[[:space:]]*$" {
+                in_block = 1
+                next
+              }
+
+              $0 ~ "^[[:space:]]*" fence "[[:space:]]*$" && in_block {
+                exit
+              }
+
+              in_block {
+                print
+              }
+            ' "${file}" > "${temp_file}"
+
+            if [ -s "${temp_file}" ]; then
+              echo "Extracted first Mermaid code block from ${file} -> ${temp_file}"
+            else
+              rm -f "${temp_file}"
+            fi
+          done
+      
+      - name: Convert Mermaid diagrams to SVG
         run: |
           mkdir -p "${MERMAID_OUTPUT_DIR}"
 
-          find "${MERMAID_SOURCE_DIR}" \
-            \( -name "*.mmd" -o -name "*.mermaid" -o -name "*.md" \) \
+          find "${MERMAID_SOURCE_DIR}" "${MERMAID_TEMP_DIR}" \
+            \( -name "*.mmd" -o -name "*.mermaid" \) \
             | while read -r file; do
 
-              relative_path="${file#${MERMAID_SOURCE_DIR}/}"
+              if [[ "${file}" == "${MERMAID_TEMP_DIR}"/* ]]; then
+                relative_path="${file#${MERMAID_TEMP_DIR}/}"
+              else
+                relative_path="${file#${MERMAID_SOURCE_DIR}/}"
+              fi
+
               output_file="${MERMAID_OUTPUT_DIR}/${relative_path%.*}.svg"
 
               mkdir -p "$(dirname "${output_file}")"
