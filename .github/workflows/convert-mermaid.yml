@@ -120,17 +120,23 @@ jobs:
         run: |
           if [ -d "${MERMAID_OUTPUT_DIR}" ]; then
             find "${MERMAID_OUTPUT_DIR}" -name "*.svg" | while read -r svg; do
-
               relative_path="${svg#${MERMAID_OUTPUT_DIR}/}"
+
+              source_md="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.md"
               source_mmd="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.mmd"
               source_mermaid="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.mermaid"
-              source_md="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.md"
 
-              if [ ! -f "${source_mmd}" ] && [ ! -f "${source_mermaid}" ]; then
+              if [ ! -f "${source_md}" ] \
+                && [ ! -f "${source_mmd}" ] \
+                && [ ! -f "${source_mermaid}" ]; then
                 echo "Removing orphaned SVG: ${svg}"
                 rm "${svg}"
               fi
             done
+
+            find "${MERMAID_OUTPUT_DIR}" -type d -empty -delete
+          else
+            echo "No generated SVG directory found at ${MERMAID_OUTPUT_DIR}; skipping orphan cleanup"
           fi
 
       - name: Commit generated SVGs if changed
