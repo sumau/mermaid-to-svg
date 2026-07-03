@@ -1,12 +1,9 @@
-// Extract the first fenced `mermaid` code block from a Markdown file.
+// Extract the first fenced `mermaid` code block from a Markdown string.
 //
 // By design only the first block is rendered: one diagram per page, one
 // predictable image name. This understands the common CommonMark fence
 // variants (backtick and tilde fences, indentation, info strings) so it is
 // more robust than a line-oriented regex, and it has no dependencies.
-
-import { readFileSync, writeFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
 
 // Match a fence opener: up to 3 spaces of indent, 3+ backticks or tildes, then
 // an optional info string whose first word is the language.
@@ -73,29 +70,4 @@ export function extractFirstMermaid(markdown) {
   }
 
   return { block: firstBlock, count };
-}
-
-// CLI: extract-mermaid.mjs <input.md> <output.mmd>
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [inputPath, outputPath] = process.argv.slice(2);
-  if (!inputPath || !outputPath) {
-    console.error("Usage: extract-mermaid.mjs <input.md> <output.mmd>");
-    process.exit(2);
-  }
-
-  const { block, count } = extractFirstMermaid(readFileSync(inputPath, "utf8"));
-
-  if (count > 1) {
-    console.log(
-      `::warning file=${inputPath}::Found ${count} mermaid blocks; only the first is rendered.`,
-    );
-  }
-
-  if (block === null || block.trim() === "") {
-    console.log(`No mermaid block found in ${inputPath}; nothing to render.`);
-    process.exit(0);
-  }
-
-  writeFileSync(outputPath, block.endsWith("\n") ? block : `${block}\n`);
-  console.log(`Extracted first mermaid block from ${inputPath} -> ${outputPath}`);
 }

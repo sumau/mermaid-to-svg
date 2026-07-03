@@ -8,7 +8,6 @@ on:
     paths:
       - "examples/**"
       - "src/**"
-      - "entrypoint.sh"
       - "Dockerfile"
       - "render.sh"
       - ".github/workflows/render-examples.yml"

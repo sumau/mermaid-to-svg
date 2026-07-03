@@ -21,8 +21,8 @@ docker build -t "$IMAGE_TAG" .
 case "${1:-render}" in
   test)
     # Tests aren't baked into the image; mount the repo and run them there.
-    docker run --rm --entrypoint node -v "$PWD":/work -w /work \
-      "$IMAGE_TAG" --test test/extract-mermaid.test.mjs
+    docker run --rm --entrypoint sh -v "$PWD":/work -w /work \
+      "$IMAGE_TAG" -c 'node --test test/*.test.mjs'
     ;;
   smoke)
     ./test/smoke-test.sh "$IMAGE_TAG"
