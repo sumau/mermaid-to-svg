@@ -1,11 +1,6 @@
 ```mermaid
-gitGraph
-    commit
-    branch develop
-    checkout develop
-    commit
-    commit
-    checkout main
-    merge develop
-    commit
+flowchart LR
+    main -->|branch| feature
+    feature -->|open PR| review
+    review -->|merge| main
 ```
