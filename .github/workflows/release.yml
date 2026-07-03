@@ -1,0 +1,58 @@
+name: Release
+
+# Cuts a release: builds the action image, pushes it to GHCR as :<version>
+# and :v<major>, creates the v<version> git tag and GitHub Release, and
+# force-moves the v<major> tag consumers pin. Run from the Actions tab.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver to release, without the leading v (e.g. 1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      IMAGE: ghcr.io/${{ github.repository }}
+
+    steps:
+      - name: Validate version
+        run: |
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Version must be X.Y.Z, got '$VERSION'" >&2
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: printf '%s' "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push image
+        run: |
+          MAJOR="v${VERSION%%.*}"
+          docker build -t "$IMAGE:$VERSION" -t "$IMAGE:$MAJOR" .
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:$MAJOR"
+
+      - name: Tag and create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MAJOR="v${VERSION%%.*}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git tag -f -a "$MAJOR" -m "$MAJOR"
+          git push origin "v$VERSION"
+          git push -f origin "$MAJOR"
+          gh release create "v$VERSION" --title "v$VERSION" --generate-notes

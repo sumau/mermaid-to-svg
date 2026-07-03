@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractFirstMermaid } from "./extract-mermaid.mjs";
+import { extractFirstMermaid } from "../src/extract-mermaid.mjs";
 
 test("extracts a single mermaid block", () => {
   const md = ["# Title", "", "```mermaid", "graph LR", "  A --> B", "```", ""].join("\n");

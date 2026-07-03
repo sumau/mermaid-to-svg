@@ -45,6 +45,9 @@ jobs:
           }
 ```
 
+The action runs a prebuilt image from GHCR, so your workflow doesn't pay for
+an image build.
+
 Then reference the generated SVG from anywhere:
 
 ```markdown
@@ -77,9 +80,37 @@ Then reference the generated SVG from anywhere:
 > the Action runs before pushing again, or your next push will be rejected as
 > non-fast-forward.
 
-## Previewing locally (optional)
+## Developing
 
-Run `./render.sh` to render `mermaid/source` → `mermaid/generated` exactly as CI
-does. It builds this action's image and runs it, so the only dependency is
-Docker and the output matches CI. `./render.sh test` runs the extractor's unit
-tests.
+- `action.yml`, `Dockerfile` — the action. `action.yml` points at the prebuilt
+  GHCR image, so `uses: ./` pulls the released image rather than testing local
+  changes — the smoke test is what exercises the working tree.
+- `src/` — all logic. `main.mjs` is the container entrypoint (I/O and mmdc
+  orchestration only); `plan.mjs` holds the pure path-mapping, collision, and
+  orphan decisions. Keep new decision logic there so it stays unit-testable.
+- `test/` — unit tests plus the end-to-end smoke test.
+- `examples/` — this repo's own diagrams. `render-examples.yml` re-renders
+  them and commits the SVGs back on every branch, so PRs show the rendered
+  image diff — keep those diffs visible, they're a review aid.
+
+Run `./render.sh` to render the examples exactly as CI does; it builds the
+action image locally, so the only dependency is Docker. Before pushing:
+
+- `npm test` — unit tests (or `./render.sh test` to run them in Docker)
+- `./render.sh smoke` — end-to-end test of the image against a fixture tree
+- `shellcheck render.sh test/smoke-test.sh` — CI lints these
+
+The commit-back snippet in the Usage example and `render-examples.yml` are
+near-duplicates; keep them in step if either changes.
+
+## Releasing
+
+Run the **Release** workflow from the Actions tab with a semver like `1.0.0`.
+It pushes the image to GHCR (`:1.0.0` and `:v1`), creates the tag and GitHub
+Release, and force-moves the `v1` tag consumers pin. Don't move `v1` by hand:
+`action.yml` at `v1` must match an image that exists on GHCR. Marketplace
+listing, if wanted, is a manual step on the Release page.
+
+## License
+
+[MIT](LICENSE)

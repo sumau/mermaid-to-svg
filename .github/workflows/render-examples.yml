@@ -1,0 +1,52 @@
+name: Render example diagrams
+
+# Re-renders examples/mermaid and commits the SVGs back to the pushed branch.
+# Runs on every branch (not just main) so PRs show the rendered image diff.
+
+on:
+  push:
+    paths:
+      - "examples/**"
+      - "src/**"
+      - "Dockerfile"
+      - "render.sh"
+      - ".github/workflows/render-examples.yml"
+  workflow_dispatch:
+
+concurrency:
+  # Serialize runs per branch so the commit-back push can't hit a
+  # non-fast-forward error when two pushes to the same branch overlap.
+  group: render-examples-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Builds the local Dockerfile and renders with it — same path as local
+      # previews, and it exercises the working tree rather than the released
+      # image action.yml points at.
+      - name: Render Mermaid to SVG
+        run: ./render.sh
+
+      - name: Commit generated SVGs if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # -A stages deleted orphaned SVGs as deletions too.
+          git add -A examples/mermaid/generated
+
+          if git diff --cached --quiet; then
+            echo "No diagram changes to commit"
+          else
+            git commit -m "Synchronize generated Mermaid diagrams"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
