@@ -1,0 +1,29 @@
+name: 'Mermaid to SVG'
+description: 'Render Mermaid diagram sources to SVGs any file in the repo can embed.'
+author: 'soumaya'
+
+branding:
+  icon: 'image'
+  color: 'purple'
+
+inputs:
+  source-dir:
+    description: 'Directory containing Mermaid sources (.mmd, .mermaid, .md).'
+    required: false
+    default: 'mermaid/source'
+  output-dir:
+    description: 'Directory the generated SVGs are written to (mirrors source-dir).'
+    required: false
+    default: 'mermaid/generated'
+  config:
+    description: 'Optional path to a Mermaid config JSON, passed to mmdc -c. Empty means mermaid-cli defaults.'
+    required: false
+    default: ''
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    SOURCE_DIR: ${{ inputs.source-dir }}
+    OUTPUT_DIR: ${{ inputs.output-dir }}
+    CONFIG: ${{ inputs.config }}
