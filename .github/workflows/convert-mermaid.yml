@@ -33,7 +33,8 @@ jobs:
 
       # The runner's Node is enough for the unit tests; no image build needed.
       - name: Test Markdown extractor
-        run: node --test scripts/
+        # Shell-expanded glob: newer Node rejects a bare directory for --test.
+        run: node --test scripts/*.test.mjs
 
       # Exercises the built image end-to-end against a fixture tree: rendering,
       # Markdown extraction, orphan cleanup, and the collision guard. The layer

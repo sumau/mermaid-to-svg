@@ -18,8 +18,8 @@ mermaid-cli image) and `scripts/extract-mermaid.mjs`.
 
 ## Testing (run before pushing)
 
-- `node --test scripts/` — extractor unit tests (or `./render.sh test` to run
-  them in Docker).
+- `node --test scripts/*.test.mjs` — extractor unit tests (or
+  `./render.sh test` to run them in Docker).
 - `./render.sh smoke` — end-to-end test of the image against a fixture tree:
   rendering, Markdown extraction, orphan cleanup, collision guard.
 
