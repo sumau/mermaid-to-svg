@@ -58,3 +58,12 @@ The Action also keeps things tidy:
 
 > **Note:** because the Action commits back to your branch, pull after it runs
 > before pushing again, or your next push will be rejected as non-fast-forward.
+
+## Why commit-back?
+
+Having CI commit the SVGs back is more awkward than the alternative (render
+locally, let CI just check they're up to date) — it means bot commits and
+pulling before your next push. We accept that for one reason: **zero local
+tooling.** Rendering Mermaid needs `mermaid-cli` and headless Chromium; keeping
+that on the runner means you push plain text and get an SVG back, with nothing
+installed. Anyone who can edit a file in GitHub's web UI can add a diagram.
