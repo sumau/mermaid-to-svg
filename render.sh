@@ -3,20 +3,19 @@
 # Render every Mermaid source under mermaid/source/ to an SVG under
 # mermaid/generated/, using the pinned mermaid-cli Docker image.
 #
-# Two phases, so CI can run them as separate steps and a failure points at the
+# Subcommands, so CI can run them as separate steps and a failure points at the
 # phase that broke:
+#   ./render.sh test      # run the Markdown-extractor unit tests
 #   ./render.sh extract   # Markdown -> mermaid text in .mermaid-tmp/
 #   ./render.sh convert   # mermaid  -> SVG (collision guard + orphan cleanup)
-# Run with no argument (./render.sh) to do both — e.g. locally to preview what
-# CI will produce. Docker is the only dependency.
+# Run with no argument (./render.sh) to extract + convert — e.g. locally to
+# preview what CI will produce. Docker is the only dependency.
 
 set -euo pipefail
 
-IMAGE="minlag/mermaid-cli:11.16.0"
-SOURCE_DIR="mermaid/source"
-OUTPUT_DIR="mermaid/generated"
-TEMP_DIR=".mermaid-tmp"
-CONFIG="mermaid/config.json"
+# Folder layout and pinned image live in one place, shared with the workflow.
+# shellcheck source=render.config
+source "$(dirname "$0")/render.config"
 
 # Run mmdc inside the image, repo mounted at /data (the image's workdir).
 # -u keeps generated files owned by the host user, not root.
@@ -33,6 +32,11 @@ node_in_image() {
 
 list_sources() {
   find "$SOURCE_DIR" \( -name '*.mmd' -o -name '*.mermaid' -o -name '*.md' \) | sort
+}
+
+# Run the Markdown-extractor unit tests using the image's Node.
+run_tests() {
+  node_in_image --test scripts/extract-mermaid.test.mjs
 }
 
 # Phase 1: extract the first mermaid block from each Markdown source into
@@ -113,10 +117,11 @@ convert() {
 }
 
 case "${1:-all}" in
+  test)    run_tests ;;
   extract) extract ;;
   convert) convert ;;
   all)     extract; convert ;;
-  *) echo "usage: $0 [extract|convert]" >&2; exit 2 ;;
+  *) echo "usage: $0 [test|extract|convert]" >&2; exit 2 ;;
 esac
 
 echo "Done."

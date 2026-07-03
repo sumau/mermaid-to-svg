@@ -8,6 +8,7 @@ on:
       - "mermaid/**"
       - "scripts/**"
       - "render.sh"
+      - "render.config"
       - ".github/workflows/convert-mermaid.yml"
   workflow_dispatch:
 
@@ -28,12 +29,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Docker is preinstalled on the runner; render.sh and the tests both run
-      # inside the pinned mermaid-cli image, so there's no Node/Puppeteer setup.
+      # Docker is preinstalled on the runner; render.sh runs everything inside
+      # the pinned mermaid-cli image, so there's no Node/Puppeteer setup.
       - name: Test Markdown extractor
-        run: |
-          docker run --rm -v "$PWD":/data --entrypoint node \
-            minlag/mermaid-cli:11.16.0 --test /data/scripts/extract-mermaid.test.mjs
+        run: ./render.sh test
 
       # Split into two phases so a failure points at the phase that broke:
       # extraction (Markdown parsing) vs conversion (Chromium rendering).
@@ -45,11 +44,13 @@ jobs:
 
       - name: Commit generated SVGs if changed
         run: |
+          source ./render.config  # for $OUTPUT_DIR
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           # -A stages deleted orphaned SVGs as deletions too.
-          git add -A mermaid/generated
+          git add -A "$OUTPUT_DIR"
 
           if git diff --cached --quiet; then
             echo "No diagram changes to commit"
