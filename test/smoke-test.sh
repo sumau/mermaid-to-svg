@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# End-to-end test of the action image against a fixture workspace: renders
+# End-to-end test of the action image against a fixture workspace: converts
 # .mmd/.mermaid/.md sources (mirroring nested paths), removes orphaned SVGs,
-# and fails on output collisions. Run via `./render.sh smoke`, which builds
+# and fails on output collisions. Run via `./convert.sh smoke`, which builds
 # the image and passes its tag here.
 
 # The single-quoted backticks in the Markdown fixtures are literal fences,
@@ -23,7 +23,7 @@ run_action() {
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
 
-# Happy path: direct render, nested path mirroring, Markdown extraction, and
+# Happy path: direct conversion, nested path mirroring, Markdown extraction, and
 # cleanup of an SVG whose source no longer exists.
 mkdir -p "$WORKSPACE/mermaid/source/nested" "$WORKSPACE/mermaid/generated"
 printf 'graph LR\n  A --> B\n' > "$WORKSPACE/mermaid/source/plain.mmd"
@@ -33,9 +33,9 @@ printf '<svg></svg>\n' > "$WORKSPACE/mermaid/generated/orphan.svg"
 
 run_action
 
-[ -s "$WORKSPACE/mermaid/generated/plain.svg" ] || fail "plain.mmd was not rendered"
-[ -s "$WORKSPACE/mermaid/generated/nested/deep.svg" ] || fail "nested/deep.mermaid was not rendered to a mirrored path"
-[ -s "$WORKSPACE/mermaid/generated/page.svg" ] || fail "mermaid block was not extracted and rendered from page.md"
+[ -s "$WORKSPACE/mermaid/generated/plain.svg" ] || fail "plain.mmd was not converted"
+[ -s "$WORKSPACE/mermaid/generated/nested/deep.svg" ] || fail "nested/deep.mermaid was not converted to a mirrored path"
+[ -s "$WORKSPACE/mermaid/generated/page.svg" ] || fail "mermaid block was not extracted and converted from page.md"
 [ ! -e "$WORKSPACE/mermaid/generated/orphan.svg" ] || fail "orphaned SVG was not removed"
 
 # Collision guard: two sources mapping to the same .svg must fail the run.

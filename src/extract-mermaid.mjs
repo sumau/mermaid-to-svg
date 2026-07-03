@@ -1,6 +1,6 @@
 // Extract the first fenced `mermaid` code block from a Markdown string.
 //
-// By design only the first block is rendered: one diagram per page, one
+// By design only the first block is converted: one diagram per page, one
 // predictable image name. This understands the common CommonMark fence
 // variants (backtick and tilde fences, indentation, info strings) so it is
 // more robust than a line-oriented regex, and it has no dependencies.

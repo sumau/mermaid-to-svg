@@ -1,4 +1,4 @@
-// Action entrypoint: render every Mermaid source under $SOURCE_DIR to an SVG
+// Action entrypoint: convert every Mermaid source under $SOURCE_DIR to an SVG
 // under $OUTPUT_DIR, using the mermaid-cli tooling baked into this image. Runs
 // inside the container with the consumer's repo mounted at the working
 // directory. Configured via env (set from the action's inputs):
@@ -7,7 +7,7 @@
 //   OUTPUT_DIR  where SVGs are written                  [default mermaid/generated]
 //   CONFIG      Mermaid config JSON for mmdc -c          [optional]
 //
-// It extracts the first mermaid block from each Markdown source, renders every
+// It extracts the first mermaid block from each Markdown source, converts every
 // source to SVG (failing on output-name collisions), then drops SVGs whose
 // source has been removed. All decisions live in plan.mjs; this file is the
 // I/O around them.
@@ -70,7 +70,7 @@ function mmdc(input, output) {
 }
 
 if (!existsSync(SOURCE_DIR)) {
-  console.log(`Source directory '${SOURCE_DIR}' does not exist; nothing to render.`);
+  console.log(`Source directory '${SOURCE_DIR}' does not exist; nothing to convert.`);
   process.exit(0);
 }
 
@@ -86,7 +86,7 @@ if (collisions.length > 0) {
   process.exit(1);
 }
 
-// Markdown sources render via a temp .mmd holding their first mermaid block.
+// Markdown sources convert via a temp .mmd holding their first mermaid block.
 const tempDir = mkdtempSync(join(tmpdir(), "mermaid-to-svg-"));
 try {
   for (const rel of sources) {
@@ -96,7 +96,7 @@ try {
     if (rel.endsWith(".md")) {
       const { block, count } = extractFirstMermaid(readFileSync(srcPath, "utf8"));
       if (count > 1) {
-        console.log(`::warning file=${srcPath}::Found ${count} mermaid blocks; only the first is rendered.`);
+        console.log(`::warning file=${srcPath}::Found ${count} mermaid blocks; only the first is converted.`);
       }
       if (block === null || block.trim() === "") {
         console.log(`No mermaid block found in ${srcPath}; skipping`);
@@ -109,7 +109,7 @@ try {
 
     const output = join(OUTPUT_DIR, outputPathFor(rel));
     mkdirSync(dirname(output), { recursive: true });
-    console.log(`Rendering ${input} -> ${output}`);
+    console.log(`Converting ${input} -> ${output}`);
     mmdc(input, output);
   }
 } finally {
