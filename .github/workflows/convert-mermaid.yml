@@ -3,12 +3,13 @@ name: Convert Mermaid diagrams to SVG
 on:
   push:
     paths:
-      # Trigger when Mermaid sources, the shared config, the extractor, the
-      # render script, or this workflow change.
+      # Trigger when Mermaid sources, the extractor, the action's files, or this
+      # workflow change.
       - "mermaid/**"
       - "scripts/**"
-      - "render.sh"
-      - "render.config"
+      - "entrypoint.sh"
+      - "Dockerfile"
+      - "action.yml"
       - ".github/workflows/convert-mermaid.yml"
   workflow_dispatch:
 
@@ -29,22 +30,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Docker is preinstalled on the runner; render.sh runs everything inside
-      # the pinned mermaid-cli image, so there's no Node/Puppeteer setup.
+      # Dogfood: render this repo's own diagrams with the action defined here.
       - name: Test Markdown extractor
         run: ./render.sh test
 
-      # Split into two phases so a failure points at the phase that broke:
-      # extraction (Markdown parsing) vs conversion (Chromium rendering).
-      - name: Extract Mermaid from Markdown
-        run: ./render.sh extract
+      - name: Render Mermaid to SVG
+        uses: ./
+        with:
+          source-dir: mermaid/source
+          output-dir: mermaid/generated
+          config: mermaid/config.json
 
-      - name: Convert Mermaid to SVG
-        run: ./render.sh convert
-
+      # Commit-back stays in the workflow for now (Phase 1): the action only
+      # renders. Whether this moves into the action is a separate decision.
       - name: Commit generated SVGs if changed
         run: |
-          source ./render.config  # for $OUTPUT_DIR
+          OUTPUT_DIR=mermaid/generated
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

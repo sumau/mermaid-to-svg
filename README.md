@@ -1,7 +1,8 @@
 # mermaid-to-svg
 
-Author [Mermaid](https://mermaid.js.org/) diagrams once and reference them as
-images across any file in the repo.
+A GitHub Action that renders [Mermaid](https://mermaid.js.org/) diagram sources
+to SVGs — so you can author a diagram once and embed it as an image across any
+file in your repo.
 
 ## The problem
 
@@ -11,15 +12,37 @@ Markdown file. You can't point one diagram at multiple pages — there's no
 embed the same one from as many files as you like, and they render everywhere
 (GitHub, docs sites, package registries, and so on).
 
-## The approach
+## Usage
 
-Keep Mermaid **sources** in one folder and let a GitHub Action render them to
-**SVGs** in another, committing the results back to the branch:
+Keep Mermaid **sources** in one folder; the action renders them to **SVGs** in
+another, mirroring the folder structure (`source/examples/seq.mmd` →
+`generated/examples/seq.svg`).
 
-```
-mermaid/
-├── source/       # you write these
-└── generated/    # the Action writes these (rendered SVGs)
+```yaml
+name: Render Mermaid
+on:
+  push:
+    paths: ["mermaid/**"]
+permissions:
+  contents: write          # so the commit-back step can push
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: sumau/mermaid-to-svg@v1
+
+      # The action only renders; commit the results back yourself.
+      - name: Commit generated SVGs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A mermaid/generated
+          git diff --cached --quiet || {
+            git commit -m "Synchronize generated Mermaid diagrams"
+            git push
+          }
 ```
 
 Then reference the generated SVG from anywhere:
@@ -28,8 +51,13 @@ Then reference the generated SVG from anywhere:
 ![](mermaid/generated/diagram.svg)
 ```
 
-Folder structure under `source/` is mirrored under `generated/`, so
-`source/examples/sequence.mmd` becomes `generated/examples/sequence.svg`.
+## Inputs
+
+| Input        | Default             | Description                                            |
+| ------------ | ------------------- | ------------------------------------------------------ |
+| `source-dir` | `mermaid/source`    | Directory containing Mermaid sources.                  |
+| `output-dir` | `mermaid/generated` | Directory the SVGs are written to (mirrors sources).   |
+| `config`     | *(none)*            | Optional path to a Mermaid config JSON (`mmdc -c`).    |
 
 ## Supported source formats
 
@@ -39,38 +67,19 @@ Folder structure under `source/` is mirrored under `generated/`, so
 | `.mermaid` | Rendered directly.                                    |
 | `.md`      | The **first** ` ```mermaid ` block is extracted and rendered — one diagram per page, one predictable image name. Extra blocks are skipped, with a warning in the Actions log. |
 
-## Workflow
-
-1. On a **branch**, add or edit files in `mermaid/source/`.
-2. Push. The [`convert-mermaid`](.github/workflows/convert-mermaid.yml) Action
-   renders each source and commits the SVGs to `mermaid/generated/` on the same
-   branch.
-3. Review the committed SVGs (GitHub's rich diff shows a before/after image),
-   then open a PR and merge to the default branch.
-
-The Action also keeps things tidy:
+## What it handles
 
 - **Orphan cleanup** — deletes generated SVGs whose source no longer exists.
 - **Collision guard** — fails the run if two sources would produce the same SVG
   (e.g. `diagram.mmd` and `diagram.md`), so nothing is silently clobbered.
-- **Per-branch concurrency** — serializes runs on a branch so overlapping pushes
-  don't collide on the commit-back.
 
-> **Note:** because the Action commits back to your branch, pull after it runs
-> before pushing again, or your next push will be rejected as non-fast-forward.
+> **Note:** the example above commits SVGs back to your branch, so pull after
+> the Action runs before pushing again, or your next push will be rejected as
+> non-fast-forward.
 
 ## Previewing locally (optional)
 
-You don't have to — CI renders on push — but to preview before pushing, run
-`./render.sh`. It renders exactly the way CI does: the only dependency is Docker
-(rendering runs in a pinned [`mermaid-cli`](https://github.com/mermaid-js/mermaid-cli)
-image), so the output matches CI byte-for-byte.
-
-## Why commit-back?
-
-Having CI commit the SVGs back is more awkward than the alternative (render
-locally, let CI just check they're up to date) — it means bot commits and
-pulling before your next push. We accept that for one reason: **zero local
-tooling.** Rendering Mermaid needs `mermaid-cli` and headless Chromium; keeping
-that on the runner means you push plain text and get an SVG back, with nothing
-installed. Anyone who can edit a file in GitHub's web UI can add a diagram.
+Run `./render.sh` to render `mermaid/source` → `mermaid/generated` exactly as CI
+does. It builds this action's image and runs it, so the only dependency is
+Docker and the output matches CI. `./render.sh test` runs the extractor's unit
+tests.
