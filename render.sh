@@ -6,6 +6,7 @@
 #
 #   ./render.sh          build the image and render mermaid/source -> mermaid/generated
 #   ./render.sh test     run the Markdown-extractor unit tests
+#   ./render.sh smoke    run the end-to-end smoke test against a fixture tree
 #
 # Unlike CI (which runs the action as root), this runs the container as your
 # host user so generated files stay owned by you, not root.
@@ -22,15 +23,17 @@ case "${1:-render}" in
     docker run --rm --entrypoint node "$IMAGE_TAG" \
       --test /action/scripts/extract-mermaid.test.mjs
     ;;
+  smoke)
+    ./scripts/smoke-test.sh "$IMAGE_TAG"
+    ;;
   render)
+    # SOURCE_DIR and OUTPUT_DIR are left to the entrypoint's defaults.
     docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
       -v "$PWD":/github/workspace -w /github/workspace \
-      -e SOURCE_DIR=mermaid/source \
-      -e OUTPUT_DIR=mermaid/generated \
       -e CONFIG=mermaid/config.json \
       "$IMAGE_TAG"
     ;;
-  *) echo "usage: $0 [render|test]" >&2; exit 2 ;;
+  *) echo "usage: $0 [render|test|smoke]" >&2; exit 2 ;;
 esac
 
 echo "Done."

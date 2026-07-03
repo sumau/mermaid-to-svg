@@ -82,4 +82,4 @@ Then reference the generated SVG from anywhere:
 Run `./render.sh` to render `mermaid/source` → `mermaid/generated` exactly as CI
 does. It builds this action's image and runs it, so the only dependency is
 Docker and the output matches CI. `./render.sh test` runs the extractor's unit
-tests.
+tests; `./render.sh smoke` runs an end-to-end test of the image.

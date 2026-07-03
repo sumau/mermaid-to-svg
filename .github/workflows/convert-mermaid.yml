@@ -8,6 +8,7 @@ on:
       - "mermaid/**"
       - "scripts/**"
       - "entrypoint.sh"
+      - "render.sh"
       - "Dockerfile"
       - "action.yml"
       - ".github/workflows/convert-mermaid.yml"
@@ -30,15 +31,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Dogfood: render this repo's own diagrams with the action defined here.
+      # The runner's Node is enough for the unit tests; no image build needed.
       - name: Test Markdown extractor
-        run: ./render.sh test
+        run: node --test scripts/
 
+      # Exercises the built image end-to-end against a fixture tree: rendering,
+      # Markdown extraction, orphan cleanup, and the collision guard. The layer
+      # cache it warms is reused when the action step below builds the image.
+      - name: Smoke-test the action image
+        run: ./render.sh smoke
+
+      # Dogfood: render this repo's own diagrams with the action defined here.
+      # source-dir and output-dir are left to the action's defaults.
       - name: Render Mermaid to SVG
         uses: ./
         with:
-          source-dir: mermaid/source
-          output-dir: mermaid/generated
           config: mermaid/config.json
 
       # Commit-back stays in the workflow for now (Phase 1): the action only
