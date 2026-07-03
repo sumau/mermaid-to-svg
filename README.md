@@ -1,8 +1,8 @@
 # mermaid-to-svg
 
-A GitHub Action that renders [Mermaid](https://mermaid.js.org/) diagram sources
-to SVGs — so you can author a diagram once and embed it as an image across any
-file in your repo.
+A GitHub Action that converts [Mermaid](https://mermaid.js.org/) diagram sources
+to SVG — so you can author a diagram once and embed it across any file in your
+repo.
 
 ## The problem
 
@@ -14,26 +14,26 @@ embed the same one from as many files as you like, and they render everywhere
 
 ## Usage
 
-Keep Mermaid **sources** in one folder; the action renders them to **SVGs** in
+Keep Mermaid **sources** in one folder; the action converts them to **SVG** in
 another, mirroring the folder structure (`source/examples/seq.mmd` →
 `generated/examples/seq.svg`).
 
 ```yaml
-name: Render Mermaid
+name: Convert Mermaid
 on:
   push:
     paths: ["mermaid/**"]
 permissions:
   contents: write          # so the commit-back step can push
 jobs:
-  render:
+  convert:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: sumau/mermaid-to-svg@v1
 
-      # The action only renders; commit the results back yourself.
+      # The action only converts; commit the results back yourself.
       - name: Commit generated SVGs
         run: |
           git config user.name "github-actions[bot]"
@@ -66,9 +66,9 @@ Then reference the generated SVG from anywhere:
 
 | Extension  | Behaviour                                             |
 | ---------- | ----------------------------------------------------- |
-| `.mmd`     | Rendered directly.                                    |
-| `.mermaid` | Rendered directly.                                    |
-| `.md`      | The **first** ` ```mermaid ` block is extracted and rendered — one diagram per page, one predictable image name. Extra blocks are skipped, with a warning in the Actions log. |
+| `.mmd`     | Converted directly.                                   |
+| `.mermaid` | Converted directly.                                   |
+| `.md`      | The **first** ` ```mermaid ` block is extracted and converted — one diagram per page, one predictable SVG name. Extra blocks are skipped, with a warning in the Actions log. |
 
 ## What it handles
 
@@ -89,18 +89,18 @@ Then reference the generated SVG from anywhere:
   orchestration only); `plan.mjs` holds the pure path-mapping, collision, and
   orphan decisions. Keep new decision logic there so it stays unit-testable.
 - `test/` — unit tests plus the end-to-end smoke test.
-- `examples/` — this repo's own diagrams. `render-examples.yml` re-renders
-  them and commits the SVGs back on every branch, so PRs show the rendered
-  image diff — keep those diffs visible, they're a review aid.
+- `examples/` — this repo's own diagrams. `convert-examples.yml` regenerates
+  them and commits the SVGs back on every branch, so PRs show the generated
+  SVG diff — keep those diffs visible, they're a review aid.
 
-Run `./render.sh` to render the examples exactly as CI does; it builds the
+Run `./convert.sh` to convert the examples exactly as CI does; it builds the
 action image locally, so the only dependency is Docker. Before pushing:
 
-- `npm test` — unit tests (or `./render.sh test` to run them in Docker)
-- `./render.sh smoke` — end-to-end test of the image against a fixture tree
-- `shellcheck render.sh test/smoke-test.sh` — CI lints these
+- `npm test` — unit tests (or `./convert.sh test` to run them in Docker)
+- `./convert.sh smoke` — end-to-end test of the image against a fixture tree
+- `shellcheck convert.sh test/smoke-test.sh` — CI lints these
 
-The commit-back snippet in the Usage example and `render-examples.yml` are
+The commit-back snippet in the Usage example and `convert-examples.yml` are
 near-duplicates; keep them in step if either changes.
 
 ## Releasing

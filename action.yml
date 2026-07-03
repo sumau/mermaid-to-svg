@@ -1,5 +1,5 @@
 name: 'Mermaid to SVG'
-description: 'Render Mermaid diagram sources to SVGs any file in the repo can embed.'
+description: 'Convert Mermaid diagram sources to SVG that any file in the repo can embed.'
 author: 'soumaya'
 
 branding:
@@ -24,7 +24,7 @@ runs:
   using: 'docker'
   # Prebuilt by the Release workflow, so consumers pull instead of building.
   # The moving :v1 image tag is updated alongside the v1 git tag on release.
-  # Local development never uses this reference — render.sh and the smoke
+  # Local development never uses this reference — convert.sh and the smoke
   # test build the Dockerfile directly.
   image: 'docker://ghcr.io/sumau/mermaid-to-svg:v1'
   env:

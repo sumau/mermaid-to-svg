@@ -1,7 +1,7 @@
-name: Render example diagrams
+name: Convert example diagrams
 
-# Re-renders examples/mermaid and commits the SVGs back to the pushed branch.
-# Runs on every branch (not just main) so PRs show the rendered image diff.
+# Re-converts examples/mermaid and commits the SVGs back to the pushed branch.
+# Runs on every branch (not just main) so PRs show the generated SVG diff.
 
 on:
   push:
@@ -9,32 +9,32 @@ on:
       - "examples/**"
       - "src/**"
       - "Dockerfile"
-      - "render.sh"
-      - ".github/workflows/render-examples.yml"
+      - "convert.sh"
+      - ".github/workflows/convert-examples.yml"
   workflow_dispatch:
 
 concurrency:
   # Serialize runs per branch so the commit-back push can't hit a
   # non-fast-forward error when two pushes to the same branch overlap.
-  group: render-examples-${{ github.ref }}
+  group: convert-examples-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: write
 
 jobs:
-  render:
+  convert:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Builds the local Dockerfile and renders with it — same path as local
+      # Builds the local Dockerfile and converts with it — same path as local
       # previews, and it exercises the working tree rather than the released
       # image action.yml points at.
-      - name: Render Mermaid to SVG
-        run: ./render.sh
+      - name: Convert Mermaid to SVG
+        run: ./convert.sh
 
       - name: Commit generated SVGs if changed
         run: |

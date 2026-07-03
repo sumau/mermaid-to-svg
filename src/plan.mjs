@@ -1,4 +1,4 @@
-// Pure decisions about which sources render to which outputs. No filesystem
+// Pure decisions about which sources convert to which outputs. No filesystem
 // access — everything operates on repo-relative paths so it can be unit
 // tested directly.
 

@@ -64,5 +64,5 @@ test("findOrphans handles nested paths", () => {
 });
 
 test("findOrphans is empty when every SVG has a source", () => {
-  assert.deepEqual(findOrphans(["a.svg"], ["a.mmd", "unrendered.md"]), []);
+  assert.deepEqual(findOrphans(["a.svg"], ["a.mmd", "unconverted.md"]), []);
 });
