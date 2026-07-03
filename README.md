@@ -59,6 +59,13 @@ The Action also keeps things tidy:
 > **Note:** because the Action commits back to your branch, pull after it runs
 > before pushing again, or your next push will be rejected as non-fast-forward.
 
+## Previewing locally (optional)
+
+You don't have to — CI renders on push — but to preview before pushing, run
+`./render.sh`. It renders exactly the way CI does: the only dependency is Docker
+(rendering runs in a pinned [`mermaid-cli`](https://github.com/mermaid-js/mermaid-cli)
+image), so the output matches CI byte-for-byte.
+
 ## Why commit-back?
 
 Having CI commit the SVGs back is more awkward than the alternative (render
