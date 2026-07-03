@@ -111,11 +111,12 @@ try {
       input = join(tempDir, rel.replace(/\.md$/, ".mmd"));
       mkdirSync(dirname(input), { recursive: true });
       writeFileSync(input, block.endsWith("\n") ? block : `${block}\n`);
+      console.log(`Extracted mermaid block from ${srcPath} -> ${input}`);
     }
 
     const output = join(OUTPUT_DIR, outputPathFor(rel));
     mkdirSync(dirname(output), { recursive: true });
-    console.log(`Converting ${srcPath} -> ${output}`);
+    console.log(`Converting ${input} -> ${output}`);
     mmdc(input, output, srcPath);
   }
 } finally {
