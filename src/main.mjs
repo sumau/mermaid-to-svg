@@ -102,7 +102,7 @@ try {
     if (rel.endsWith(".md")) {
       const { block, count } = extractFirstMermaid(readFileSync(srcPath, "utf8"));
       if (block === null || block.trim() === "") {
-        console.log(`::warning file=${srcPath}::No mermaid block found; skipping.`);
+        console.log(`::warning file=${srcPath}::No mermaid block found in ${srcPath}; skipping.`);
         continue;
       }
       input = join(tempDir, rel.replace(/\.md$/, ".mmd"));
