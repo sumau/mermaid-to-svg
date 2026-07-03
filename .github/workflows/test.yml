@@ -1,0 +1,37 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Shellcheck
+        run: shellcheck entrypoint.sh render.sh test/smoke-test.sh
+
+      - name: Lint workflows
+        uses: docker://rhysd/actionlint:1.7.7
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # The runner's Node is enough for the unit tests; no image build needed.
+      - name: Unit tests
+        run: npm test
+
+      # Builds the action image and exercises it end-to-end against a fixture
+      # tree: rendering, Markdown extraction, orphan cleanup, collision guard.
+      # This is what tests entrypoint.sh, since action.yml points at the
+      # prebuilt GHCR image rather than the local Dockerfile.
+      - name: Smoke test
+        run: ./render.sh smoke

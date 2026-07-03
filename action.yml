@@ -22,7 +22,11 @@ inputs:
 
 runs:
   using: 'docker'
-  image: 'Dockerfile'
+  # Prebuilt by the Release workflow, so consumers pull instead of building.
+  # The moving :v1 image tag is updated alongside the v1 git tag on release.
+  # Local development never uses this reference — render.sh and the smoke
+  # test build the Dockerfile directly.
+  image: 'docker://ghcr.io/sumau/mermaid-to-svg:v1'
   env:
     SOURCE_DIR: ${{ inputs.source-dir }}
     OUTPUT_DIR: ${{ inputs.output-dir }}

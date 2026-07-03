@@ -1,33 +1,41 @@
 # mermaid-to-svg
 
 Docker-based GitHub Action that renders Mermaid sources to SVGs. Usage lives in
-the README; the rendering logic lives in `entrypoint.sh` (bash, runs in the
-mermaid-cli image) and `scripts/extract-mermaid.mjs`.
+the README.
+
+## Layout
+
+- `action.yml`, `Dockerfile`, `entrypoint.sh` — the action. `action.yml`
+  points at the prebuilt GHCR image (`:v1`), so `uses: ./` would pull the
+  released image, not test local changes — the smoke test covers those.
+- `src/` — the Markdown extractor; baked into the image at `/action/src`.
+- `test/` — unit tests and the end-to-end smoke test.
+- `examples/` — this repo's own diagrams, rendered by `render-examples.yml`.
 
 ## Conventions
 
-- Path defaults (`mermaid/source`, `mermaid/generated`) are defined in
-  `action.yml` and `entrypoint.sh`; callers rely on the defaults rather than
-  repeating the paths.
+- Path defaults (`mermaid/source`, `mermaid/generated`) live in `action.yml`
+  and `entrypoint.sh`; the examples override them explicitly.
 - Generated SVGs are committed, and their diffs should stay visible in PRs —
   the rendered image diff is a review aid, don't collapse them.
+  `render-examples.yml` runs on every branch for this reason.
 - Keep README and doc prose short.
-- The commit-back snippet exists in both the README and the workflow; keep them
-  in step if either changes. Moving commit-back into the action is a separate,
-  undecided phase.
+- The commit-back snippet exists in both the README and
+  `render-examples.yml`; keep them in step if either changes. Moving
+  commit-back into the action is a separate, undecided phase.
 
 ## Testing (run before pushing)
 
-- `node --test scripts/*.test.mjs` — extractor unit tests (or
-  `./render.sh test` to run them in Docker).
+- `npm test` — extractor unit tests (or `./render.sh test` to run them in
+  Docker).
 - `./render.sh smoke` — end-to-end test of the image against a fixture tree:
   rendering, Markdown extraction, orphan cleanup, collision guard.
+- `shellcheck entrypoint.sh render.sh test/smoke-test.sh` — CI lints these.
 
 ## Releases
 
-Consumers pin `sumau/mermaid-to-svg@v1`. After merging a release-worthy change
-to main, move the tag:
-
-```sh
-git tag -f -a v1 -m "v1" && git push -f origin v1
-```
+Run the **Release** workflow from the Actions tab with a semver like `1.0.0`.
+It pushes the image to GHCR (`:1.0.0` and `:v1`), creates the `v1.0.0` tag and
+GitHub Release, and force-moves the `v1` tag consumers pin. Don't move `v1` by
+hand: `action.yml` at `v1` must match an image that exists on GHCR.
+Marketplace listing, if wanted, is a manual step on the Release page.

@@ -3,7 +3,7 @@
 # This FROM is the single source of truth for the mermaid-cli version.
 FROM minlag/mermaid-cli:11.16.0
 
-COPY scripts/ /action/scripts/
+COPY src/ /action/src/
 COPY entrypoint.sh /action/entrypoint.sh
 
 # The base image runs as a non-root user; GitHub runs Docker actions as root and

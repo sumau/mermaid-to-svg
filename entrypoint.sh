@@ -24,7 +24,7 @@ CONFIG="${CONFIG:-}"
 # both explicitly.
 MMDC=/home/mermaidcli/node_modules/.bin/mmdc
 PUPPETEER_CONFIG=/puppeteer-config.json
-SCRIPTS=/action/scripts
+SCRIPTS=/action/src
 
 TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEMP_DIR"' EXIT

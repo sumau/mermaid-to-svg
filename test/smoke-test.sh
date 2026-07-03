@@ -5,6 +5,10 @@
 # and fails on output collisions. Run via `./render.sh smoke`, which builds
 # the image and passes its tag here.
 
+# The single-quoted backticks in the Markdown fixtures are literal fences,
+# not command substitutions.
+# shellcheck disable=SC2016
+
 set -euo pipefail
 
 IMAGE_TAG="${1:?usage: smoke-test.sh <image-tag>}"

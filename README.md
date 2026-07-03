@@ -45,6 +45,9 @@ jobs:
           }
 ```
 
+The action runs a prebuilt image from GHCR, so your workflow doesn't pay for
+an image build.
+
 Then reference the generated SVG from anywhere:
 
 ```markdown
@@ -77,9 +80,14 @@ Then reference the generated SVG from anywhere:
 > the Action runs before pushing again, or your next push will be rejected as
 > non-fast-forward.
 
-## Previewing locally (optional)
+## Developing
 
-Run `./render.sh` to render `mermaid/source` → `mermaid/generated` exactly as CI
-does. It builds this action's image and runs it, so the only dependency is
-Docker and the output matches CI. `./render.sh test` runs the extractor's unit
-tests; `./render.sh smoke` runs an end-to-end test of the image.
+Run `./render.sh` to render this repo's example diagrams
+(`examples/mermaid/source` → `examples/mermaid/generated`) exactly as CI does.
+It builds the action image locally and runs it, so the only dependency is
+Docker. `./render.sh test` runs the extractor's unit tests (or `npm test`
+without Docker); `./render.sh smoke` runs an end-to-end test of the image.
+
+## License
+
+[MIT](LICENSE)
