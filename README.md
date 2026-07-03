@@ -75,6 +75,8 @@ Then reference the generated SVG from anywhere:
 - **Orphan cleanup** — deletes generated SVGs whose source no longer exists.
 - **Collision guard** — fails the run if two sources would produce the same SVG
   (e.g. `diagram.mmd` and `diagram.md`), so nothing is silently clobbered.
+- **Diagram-less Markdown** — a `.md` source with no ` ```mermaid ` block is
+  skipped with a warning in the Actions log, not treated as an error.
 
 > **Note:** the example above commits SVGs back to your branch, so pull after
 > the Action runs before pushing again, or your next push will be rejected as

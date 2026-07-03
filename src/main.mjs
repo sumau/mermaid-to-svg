@@ -58,15 +58,18 @@ function removeEmptyDirs(dir) {
   if (readdirSync(dir).length === 0) rmdirSync(dir);
 }
 
-function mmdc(input, output) {
+function mmdc(input, output, srcPath) {
   const args = ["-p", PUPPETEER_CONFIG, "-i", input, "-o", output];
   if (CONFIG) args.unshift("-c", CONFIG);
   const result = spawnSync(MMDC, args, { stdio: "inherit" });
   if (result.error) {
-    console.error(`Failed to run mmdc: ${result.error.message}`);
+    console.log(`::error file=${srcPath}::Failed to run mmdc: ${result.error.message}`);
     process.exit(1);
   }
-  if (result.status !== 0) process.exit(result.status ?? 1);
+  if (result.status !== 0) {
+    console.log(`::error file=${srcPath}::mmdc failed to convert ${srcPath} (exit ${result.status}); see log above.`);
+    process.exit(result.status ?? 1);
+  }
 }
 
 if (!existsSync(SOURCE_DIR)) {
@@ -82,6 +85,9 @@ if (collisions.length > 0) {
   for (const { output, sources: culprits } of collisions) {
     console.error(`  ${join(OUTPUT_DIR, output)} <-`);
     for (const src of culprits) console.error(`    ${join(SOURCE_DIR, src)}`);
+    for (const src of culprits) {
+      console.log(`::error file=${join(SOURCE_DIR, src)}::Collides on ${join(OUTPUT_DIR, output)}; rename so each source produces a unique .svg.`);
+    }
   }
   process.exit(1);
 }
@@ -95,22 +101,23 @@ try {
 
     if (rel.endsWith(".md")) {
       const { block, count } = extractFirstMermaid(readFileSync(srcPath, "utf8"));
-      if (count > 1) {
-        console.log(`::warning file=${srcPath}::Found ${count} mermaid blocks; only the first is converted.`);
-      }
       if (block === null || block.trim() === "") {
-        console.log(`No mermaid block found in ${srcPath}; skipping`);
+        console.log(`::warning file=${srcPath}::No mermaid block found in ${srcPath}; skipping.`);
         continue;
       }
       input = join(tempDir, rel.replace(/\.md$/, ".mmd"));
       mkdirSync(dirname(input), { recursive: true });
       writeFileSync(input, block.endsWith("\n") ? block : `${block}\n`);
+      console.log(`Extracted mermaid block from ${srcPath} -> ${input}`);
+      if (count > 1) {
+        console.log(`::warning file=${srcPath}::Found ${count} mermaid blocks; only the first was extracted.`);
+      }
     }
 
     const output = join(OUTPUT_DIR, outputPathFor(rel));
     mkdirSync(dirname(output), { recursive: true });
     console.log(`Converting ${input} -> ${output}`);
-    mmdc(input, output);
+    mmdc(input, output, srcPath);
   }
 } finally {
   rmSync(tempDir, { recursive: true, force: true });

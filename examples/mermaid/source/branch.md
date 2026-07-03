@@ -1,6 +1,6 @@
 ```mermaid
-graph LR
-    A[Square Rect] -- Link text --> B((Circle))
-    A --> C(Round Rect)
-    B --> D{Rhombus}
+flowchart LR
+    main -->|branch| feature
+    feature -->|open PR| review
+    review -->|merge| main
 ```
