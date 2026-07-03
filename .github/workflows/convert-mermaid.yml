@@ -11,6 +11,12 @@ on:
       - ".github/workflows/convert-mermaid.yml"
   workflow_dispatch:
 
+concurrency:
+  # Serialize runs per branch so the commit-back push can't hit a
+  # non-fast-forward error when two pushes to the same branch overlap.
+  group: mermaid-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   # Source files are authored here.
   MERMAID_SOURCE_DIR: mermaid/source
@@ -95,6 +101,14 @@ jobs:
               }
             ' "${file}" > "${temp_file}"
 
+            # By design only the first mermaid block is rendered (one diagram per
+            # page, one predictable image name). Warn when a page has more, so the
+            # skipped blocks are visible in the Actions log instead of vanishing silently.
+            block_count=$(grep -cE '^[[:space:]]*```mermaid[[:space:]]*$' "${file}")
+            if [ "${block_count}" -gt 1 ]; then
+              echo "::warning file=${file}::Found ${block_count} mermaid blocks; only the first is rendered."
+            fi
+
             if [ -s "${temp_file}" ]; then
               echo "Extracted first Mermaid code block from ${file} -> ${temp_file}"
             else
@@ -106,30 +120,42 @@ jobs:
         run: |
           mkdir -p "${MERMAID_OUTPUT_DIR}"
 
+          # Track which source produced each output so two sources that map to the
+          # same .svg (e.g. diagram.mmd and diagram.md) fail loudly instead of
+          # silently clobbering each other in a nondeterministic order.
+          declare -A output_source
+
           # Render authored Mermaid files and temporary Markdown extractions.
-          find "${MERMAID_SOURCE_DIR}" "${MERMAID_TEMP_DIR}" \
-            \( -name "*.mmd" -o -name "*.mermaid" \) \
-            | while read -r file; do
+          # Process substitution (rather than a pipe) keeps output_source populated
+          # in this shell; a pipe would run the loop body in a subshell and lose it.
+          while read -r file; do
+            # Work out the relative path from the correct source root.
+            if [[ "${file}" == "${MERMAID_TEMP_DIR}"/* ]]; then
+              relative_path="${file#${MERMAID_TEMP_DIR}/}"
+            else
+              relative_path="${file#${MERMAID_SOURCE_DIR}/}"
+            fi
 
-              # Work out the relative path from the correct source root.
-              if [[ "${file}" == "${MERMAID_TEMP_DIR}"/* ]]; then
-                relative_path="${file#${MERMAID_TEMP_DIR}/}"
-              else
-                relative_path="${file#${MERMAID_SOURCE_DIR}/}"
-              fi
+            # Preserve folder structure and replace the source extension with .svg.
+            output_file="${MERMAID_OUTPUT_DIR}/${relative_path%.*}.svg"
 
-              # Preserve folder structure and replace the source extension with .svg.
-              output_file="${MERMAID_OUTPUT_DIR}/${relative_path%.*}.svg"
+            # Fail if a different source already claimed this output path.
+            if [ -n "${output_source[${output_file}]:-}" ]; then
+              echo "::error::Output collision: '${file}' and '${output_source[${output_file}]}' both map to '${output_file}'. Rename one source so each produces a unique .svg."
+              exit 1
+            fi
+            output_source[${output_file}]="${file}"
 
-              mkdir -p "$(dirname "${output_file}")"
+            mkdir -p "$(dirname "${output_file}")"
 
-              echo "Rendering ${file} -> ${output_file}"
+            echo "Rendering ${file} -> ${output_file}"
 
-              npx mmdc \
-                -p puppeteer-config.json \
-                -i "${file}" \
-                -o "${output_file}"
-            done
+            npx mmdc \
+              -p puppeteer-config.json \
+              -i "${file}" \
+              -o "${output_file}"
+          done < <(find "${MERMAID_SOURCE_DIR}" "${MERMAID_TEMP_DIR}" \
+            \( -name "*.mmd" -o -name "*.mermaid" \))
 
       - name: Remove orphaned SVGs
         run: |

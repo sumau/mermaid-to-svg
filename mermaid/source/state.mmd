@@ -1,0 +1,6 @@
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> InReview: open PR
+    InReview --> Merged: approve
+    InReview --> Draft: request changes
+    Merged --> [*]
