@@ -17,7 +17,6 @@ SOURCE_DIR="mermaid/source"
 OUTPUT_DIR="mermaid/generated"
 TEMP_DIR=".mermaid-tmp"
 CONFIG="mermaid/config.json"
-PUPPETEER_CONFIG="puppeteer-config.json"
 
 # Run mmdc inside the image, with the repo mounted at /data (the image's
 # workdir). -u keeps generated files owned by the host user, not root.
@@ -80,7 +79,9 @@ while IFS= read -r src; do
   esac
 
   echo "Rendering $input -> $out"
-  mmdc_in_image -p "$PUPPETEER_CONFIG" -c "$CONFIG" -i "$input" -o "$out"
+  # No -p: the pinned image ships its own /puppeteer-config.json (system
+  # Chromium + --no-sandbox) and passes it by default.
+  mmdc_in_image -c "$CONFIG" -i "$input" -o "$out"
 done < "$sources_file"
 
 # Remove generated SVGs whose source no longer exists.

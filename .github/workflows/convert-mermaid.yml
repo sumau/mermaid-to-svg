@@ -6,7 +6,6 @@ on:
       - "mermaid/**"
       - "scripts/**"
       - "render.sh"
-      - "puppeteer-config.json"
       - ".github/workflows/convert-mermaid.yml"
   push:
     branches: [main]
