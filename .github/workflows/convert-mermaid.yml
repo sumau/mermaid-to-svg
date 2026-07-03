@@ -35,8 +35,13 @@ jobs:
           docker run --rm -v "$PWD":/data --entrypoint node \
             minlag/mermaid-cli:11.16.0 --test /data/scripts/extract-mermaid.test.mjs
 
-      - name: Render diagrams
-        run: ./render.sh
+      # Split into two phases so a failure points at the phase that broke:
+      # extraction (Markdown parsing) vs conversion (Chromium rendering).
+      - name: Extract Mermaid from Markdown
+        run: ./render.sh extract
+
+      - name: Convert Mermaid to SVG
+        run: ./render.sh convert
 
       - name: Commit generated SVGs if changed
         run: |
