@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant Dev as Developer
+    participant GH as GitHub
+    participant CI as Action
+    Dev->>GH: Push mermaid source
+    GH->>CI: Trigger convert-mermaid
+    CI->>CI: Render SVG
+    CI->>GH: Commit generated SVG

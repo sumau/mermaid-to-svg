@@ -3,23 +3,20 @@ name: Convert Mermaid diagrams to SVG
 on:
   push:
     paths:
-      # Trigger when Mermaid source files or Markdown Mermaid files change.
-      # These paths cannot use env variables because GitHub evaluates them before jobs run.
-      - "mermaid/source/**/*.mmd"
-      - "mermaid/source/**/*.mermaid"
-      - "mermaid/source/**/*.md"
+      # Trigger when Mermaid sources, the shared config, the extractor, the
+      # render script, or this workflow change.
+      - "mermaid/**"
+      - "scripts/**"
+      - "render.sh"
+      - "render.config"
       - ".github/workflows/convert-mermaid.yml"
   workflow_dispatch:
 
-env:
-  # Source files are authored here.
-  MERMAID_SOURCE_DIR: mermaid/source
-
-  # Generated SVGs are committed here.
-  MERMAID_OUTPUT_DIR: mermaid/generated
-
-  # Temporary extracted .mmd files from Markdown are written here.
-  MERMAID_TEMP_DIR: .mermaid-tmp
+concurrency:
+  # Serialize runs per branch so the commit-back push can't hit a
+  # non-fast-forward error when two pushes to the same branch overlap.
+  group: mermaid-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -31,143 +28,29 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      # Docker is preinstalled on the runner; render.sh runs everything inside
+      # the pinned mermaid-cli image, so there's no Node/Puppeteer setup.
+      - name: Test Markdown extractor
+        run: ./render.sh test
 
-      - name: Install Mermaid CLI and Puppeteer
-        run: |
-          npm install --no-save @mermaid-js/mermaid-cli puppeteer
+      # Split into two phases so a failure points at the phase that broke:
+      # extraction (Markdown parsing) vs conversion (Chromium rendering).
+      - name: Extract Mermaid from Markdown
+        run: ./render.sh extract
 
-      - name: Create Puppeteer config
-        run: |
-          cat > puppeteer-config.json <<'EOF'
-          {
-            "args": [
-              "--no-sandbox",
-              "--disable-setuid-sandbox",
-              "--disable-dev-shm-usage"
-            ]
-          }
-          EOF
-
-      - name: Extract first Mermaid code block from Markdown
-        run: |
-          # Recreate the temp directory on each run.
-          rm -rf "${MERMAID_TEMP_DIR}"
-          mkdir -p "${MERMAID_TEMP_DIR}"
-
-          # If there are no Markdown files, there is nothing to extract.
-          if ! find "${MERMAID_SOURCE_DIR}" -name "*.md" | grep -q .; then
-            echo "No .md files found in ${MERMAID_SOURCE_DIR}; skipping Markdown extraction"
-            exit 0
-          fi
-
-          find "${MERMAID_SOURCE_DIR}" -name "*.md" | while read -r file; do
-            # Preserve the source directory structure in the temp directory.
-            relative_path="${file#${MERMAID_SOURCE_DIR}/}"
-            temp_file="${MERMAID_TEMP_DIR}/${relative_path%.md}.mmd"
-
-            mkdir -p "$(dirname "${temp_file}")"
-
-            # Extract only the first fenced Mermaid code block.
-            # The backtick fence is built using ASCII 96 to avoid literal triple-backtick issues.
-            awk '
-              BEGIN {
-                fence = sprintf("%c%c%c", 96, 96, 96)
-              }
-
-              $0 ~ "^[[:space:]]*" fence "mermaid[[:space:]]*$" {
-                in_block = 1
-                next
-              }
-
-              $0 ~ "^[[:space:]]*" fence "[[:space:]]*$" && in_block {
-                exit
-              }
-
-              in_block {
-                print
-              }
-            ' "${file}" > "${temp_file}"
-
-            if [ -s "${temp_file}" ]; then
-              echo "Extracted first Mermaid code block from ${file} -> ${temp_file}"
-            else
-              rm -f "${temp_file}"
-            fi
-          done
-
-      - name: Generate Mermaid SVG diagrams
-        run: |
-          mkdir -p "${MERMAID_OUTPUT_DIR}"
-
-          # Render authored Mermaid files and temporary Markdown extractions.
-          find "${MERMAID_SOURCE_DIR}" "${MERMAID_TEMP_DIR}" \
-            \( -name "*.mmd" -o -name "*.mermaid" \) \
-            | while read -r file; do
-
-              # Work out the relative path from the correct source root.
-              if [[ "${file}" == "${MERMAID_TEMP_DIR}"/* ]]; then
-                relative_path="${file#${MERMAID_TEMP_DIR}/}"
-              else
-                relative_path="${file#${MERMAID_SOURCE_DIR}/}"
-              fi
-
-              # Preserve folder structure and replace the source extension with .svg.
-              output_file="${MERMAID_OUTPUT_DIR}/${relative_path%.*}.svg"
-
-              mkdir -p "$(dirname "${output_file}")"
-
-              echo "Rendering ${file} -> ${output_file}"
-
-              npx mmdc \
-                -p puppeteer-config.json \
-                -i "${file}" \
-                -o "${output_file}"
-            done
-
-      - name: Remove orphaned SVGs
-        run: |
-          if [ -d "${MERMAID_OUTPUT_DIR}" ]; then
-            find "${MERMAID_OUTPUT_DIR}" -name "*.svg" | while read -r svg; do
-              relative_path="${svg#${MERMAID_OUTPUT_DIR}/}"
-
-              # A generated SVG is valid if a matching source file still exists.
-              source_md="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.md"
-              source_mmd="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.mmd"
-              source_mermaid="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.mermaid"
-
-              if [ ! -f "${source_md}" ] \
-                && [ ! -f "${source_mmd}" ] \
-                && [ ! -f "${source_mermaid}" ]; then
-                echo "Removing orphaned SVG: ${svg}"
-                rm "${svg}"
-              fi
-            done
-
-            # Remove empty generated directories left behind after deleting SVGs.
-            find "${MERMAID_OUTPUT_DIR}" -type d -empty -delete
-          else
-            echo "No generated SVG directory found at ${MERMAID_OUTPUT_DIR}; skipping orphan cleanup"
-          fi
-
-      - name: Remove temporary Markdown extractions
-        run: |
-          echo "Removing temporary Mermaid extraction directory"
-          rm -rf "${MERMAID_TEMP_DIR}"
+      - name: Convert Mermaid to SVG
+        run: ./render.sh convert
 
       - name: Commit generated SVGs if changed
         run: |
+          source ./render.config  # for $OUTPUT_DIR
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # -A is needed so deleted orphaned SVGs are staged as deletions.
-          git add -A "${MERMAID_OUTPUT_DIR}"
+          # -A stages deleted orphaned SVGs as deletions too.
+          git add -A "$OUTPUT_DIR"
 
           if git diff --cached --quiet; then
             echo "No diagram changes to commit"

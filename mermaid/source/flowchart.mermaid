@@ -1,0 +1,6 @@
+flowchart TD
+    A[Author diagram] --> B{Format?}
+    B -->|.mmd / .mermaid| C[Render directly]
+    B -->|.md| D[Extract first block]
+    D --> C
+    C --> E[Commit SVG]
