@@ -1,248 +1,50 @@
-name: Convert Mermaid diagrams to SVG
+name: Verify Mermaid diagrams are up to date
 
 on:
-  push:
+  pull_request:
     paths:
-      # Trigger when Mermaid sources, the shared config, the extractor, or this
-      # workflow change. These paths cannot use env variables because GitHub
-      # evaluates them before jobs run.
-      - "mermaid/source/**/*.mmd"
-      - "mermaid/source/**/*.mermaid"
-      - "mermaid/source/**/*.md"
-      - "mermaid/config.json"
-      - "scripts/extract-mermaid.mjs"
+      - "mermaid/**"
+      - "scripts/**"
+      - "render.sh"
+      - "puppeteer-config.json"
       - ".github/workflows/convert-mermaid.yml"
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  # Serialize runs per branch so the commit-back push can't hit a
-  # non-fast-forward error when two pushes to the same branch overlap.
-  group: mermaid-${{ github.ref }}
+  group: mermaid-verify-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Source files are authored here.
-  MERMAID_SOURCE_DIR: mermaid/source
-
-  # Generated SVGs are committed here.
-  MERMAID_OUTPUT_DIR: mermaid/generated
-
-  # Temporary extracted .mmd files from Markdown are written here.
-  MERMAID_TEMP_DIR: .mermaid-tmp
-
-  # Shared Mermaid config (theme, etc.) applied to every diagram.
-  MERMAID_CONFIG: mermaid/config.json
-
-  # Pinned toolchain: the renderer is part of the committed output, so an
-  # unpinned bump could silently rewrite every SVG.
-  MERMAID_CLI_VERSION: "11.16.0"
-  PUPPETEER_VERSION: "25.3.0"
-
+# Read-only: this workflow verifies, it never commits.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  convert:
+  verify:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
+      # Docker is preinstalled on the runner, so no Node/Puppeteer setup is
+      # needed. render.sh and the tests both run inside the pinned image.
       - name: Test Markdown extractor
-        run: node --test scripts/extract-mermaid.test.mjs
+        run: make test
 
-      - name: Install Mermaid CLI and Puppeteer
+      - name: Render diagrams
+        run: ./render.sh
+
+      - name: Check diagrams are committed and up to date
         run: |
-          npm install --no-save \
-            "@mermaid-js/mermaid-cli@${MERMAID_CLI_VERSION}" \
-            "puppeteer@${PUPPETEER_VERSION}"
-
-      - name: Create Puppeteer config
-        run: |
-          cat > puppeteer-config.json <<'EOF'
-          {
-            "args": [
-              "--no-sandbox",
-              "--disable-setuid-sandbox",
-              "--disable-dev-shm-usage"
-            ]
-          }
-          EOF
-
-      - name: Check for output collisions
-        run: |
-          # Runs over every source (not just the changed ones) so a .mmd and .md
-          # mapping to the same .svg are caught even when only one changed.
-          declare -A output_source
-          collision=0
-          while read -r file; do
-            relative_path="${file#${MERMAID_SOURCE_DIR}/}"
-            output_file="${MERMAID_OUTPUT_DIR}/${relative_path%.*}.svg"
-            if [ -n "${output_source[${output_file}]:-}" ]; then
-              echo "::error::Output collision: '${file}' and '${output_source[${output_file}]}' both map to '${output_file}'. Rename one source so each produces a unique .svg."
-              collision=1
-            fi
-            output_source[${output_file}]="${file}"
-          done < <(find "${MERMAID_SOURCE_DIR}" \
-            \( -name '*.mmd' -o -name '*.mermaid' -o -name '*.md' \))
-          [ "${collision}" -eq 0 ]
-
-      - name: Determine which sources to render
-        env:
-          BASE_SHA: ${{ github.event.before }}
-        run: |
-          render_list="${RUNNER_TEMP}/render_sources.txt"
-          : > "${render_list}"
-          echo "RENDER_LIST=${render_list}" >> "${GITHUB_ENV}"
-
-          full_render() {
-            echo "Full render (${1})"
-            find "${MERMAID_SOURCE_DIR}" \
-              \( -name '*.mmd' -o -name '*.mermaid' -o -name '*.md' \) \
-              > "${render_list}"
-          }
-
-          # Manual runs re-render everything.
-          if [ "${GITHUB_EVENT_NAME}" != "push" ]; then
-            full_render "event is ${GITHUB_EVENT_NAME}"
-            exit 0
+          # render.sh writes into mermaid/generated; if anything changed, the
+          # committed SVGs don't match their sources.
+          changes="$(git status --porcelain -- mermaid/generated)"
+          if [ -n "${changes}" ]; then
+            echo "::error::Generated SVGs are out of date. Run 'make diagrams' (or ./render.sh) and commit the result."
+            echo "${changes}"
+            git --no-pager diff --stat -- mermaid/generated
+            exit 1
           fi
-
-          # New branch or an unreachable base commit: nothing to diff against.
-          if [ -z "${BASE_SHA}" ] \
-            || [ "${BASE_SHA}" = "0000000000000000000000000000000000000000" ] \
-            || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            full_render "no usable base commit"
-            exit 0
-          fi
-
-          changed="$(git diff --name-only "${BASE_SHA}" "${GITHUB_SHA}")"
-
-          # A change to the shared config, the extractor, or this workflow can
-          # affect every diagram, so re-render all of them.
-          if echo "${changed}" | grep -qxF \
-            -e "${MERMAID_CONFIG}" \
-            -e "scripts/extract-mermaid.mjs" \
-            -e ".github/workflows/convert-mermaid.yml"; then
-            full_render "shared config, extractor, or workflow changed"
-            exit 0
-          fi
-
-          # Otherwise render only changed sources that still exist; deletions are
-          # handled by the orphan-cleanup step.
-          matches="$(echo "${changed}" \
-            | grep -E "^${MERMAID_SOURCE_DIR}/.*\.(mmd|mermaid|md)$" || true)"
-          if [ -n "${matches}" ]; then
-            while read -r f; do
-              if [ -f "${f}" ]; then echo "${f}" >> "${render_list}"; fi
-            done <<< "${matches}"
-          fi
-
-          echo "Sources to render:"
-          cat "${render_list}"
-
-      - name: Extract first Mermaid block from Markdown sources
-        run: |
-          rm -rf "${MERMAID_TEMP_DIR}"
-          mkdir -p "${MERMAID_TEMP_DIR}"
-
-          md_files="$(grep -E '\.md$' "${RENDER_LIST}" || true)"
-          if [ -z "${md_files}" ]; then
-            echo "No Markdown sources in scope; skipping extraction"
-            exit 0
-          fi
-
-          while read -r file; do
-            relative_path="${file#${MERMAID_SOURCE_DIR}/}"
-            temp_file="${MERMAID_TEMP_DIR}/${relative_path%.md}.mmd"
-            mkdir -p "$(dirname "${temp_file}")"
-            node scripts/extract-mermaid.mjs "${file}" "${temp_file}"
-          done <<< "${md_files}"
-
-      - name: Generate Mermaid SVG diagrams
-        run: |
-          mkdir -p "${MERMAID_OUTPUT_DIR}"
-
-          # In-scope authored .mmd/.mermaid sources plus every temporary
-          # extraction from an in-scope Markdown file.
-          render_inputs="${RUNNER_TEMP}/render_inputs.txt"
-          grep -E '\.(mmd|mermaid)$' "${RENDER_LIST}" > "${render_inputs}" || true
-          find "${MERMAID_TEMP_DIR}" -name '*.mmd' >> "${render_inputs}" 2>/dev/null || true
-
-          if [ ! -s "${render_inputs}" ]; then
-            echo "No diagrams to render"
-            exit 0
-          fi
-
-          while read -r file; do
-            # Work out the relative path from the correct source root.
-            if [[ "${file}" == "${MERMAID_TEMP_DIR}"/* ]]; then
-              relative_path="${file#${MERMAID_TEMP_DIR}/}"
-            else
-              relative_path="${file#${MERMAID_SOURCE_DIR}/}"
-            fi
-
-            # Preserve folder structure and replace the source extension with .svg.
-            output_file="${MERMAID_OUTPUT_DIR}/${relative_path%.*}.svg"
-            mkdir -p "$(dirname "${output_file}")"
-
-            echo "Rendering ${file} -> ${output_file}"
-            npx mmdc \
-              -p puppeteer-config.json \
-              -c "${MERMAID_CONFIG}" \
-              -i "${file}" \
-              -o "${output_file}"
-          done < "${render_inputs}"
-
-      - name: Remove orphaned SVGs
-        run: |
-          if [ -d "${MERMAID_OUTPUT_DIR}" ]; then
-            find "${MERMAID_OUTPUT_DIR}" -name "*.svg" | while read -r svg; do
-              relative_path="${svg#${MERMAID_OUTPUT_DIR}/}"
-
-              # A generated SVG is valid if a matching source file still exists.
-              source_md="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.md"
-              source_mmd="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.mmd"
-              source_mermaid="${MERMAID_SOURCE_DIR}/${relative_path%.svg}.mermaid"
-
-              if [ ! -f "${source_md}" ] \
-                && [ ! -f "${source_mmd}" ] \
-                && [ ! -f "${source_mermaid}" ]; then
-                echo "Removing orphaned SVG: ${svg}"
-                rm "${svg}"
-              fi
-            done
-
-            # Remove empty generated directories left behind after deleting SVGs.
-            find "${MERMAID_OUTPUT_DIR}" -type d -empty -delete
-          else
-            echo "No generated SVG directory found at ${MERMAID_OUTPUT_DIR}; skipping orphan cleanup"
-          fi
-
-      - name: Remove temporary Markdown extractions
-        run: |
-          echo "Removing temporary Mermaid extraction directory"
-          rm -rf "${MERMAID_TEMP_DIR}"
-
-      - name: Commit generated SVGs if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # -A is needed so deleted orphaned SVGs are staged as deletions.
-          git add -A "${MERMAID_OUTPUT_DIR}"
-
-          if git diff --cached --quiet; then
-            echo "No diagram changes to commit"
-          else
-            git commit -m "Synchronize generated Mermaid diagrams"
-            git push origin HEAD:${GITHUB_REF_NAME}
-          fi
+          echo "Diagrams are up to date."
