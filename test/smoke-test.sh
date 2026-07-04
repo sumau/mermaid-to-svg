@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# End-to-end test of the action image against a fixture workspace: converts
-# .mmd/.mermaid/.md sources (mirroring nested paths), removes orphaned SVGs,
-# and fails on output collisions. Run via `./convert.sh smoke`, which builds
-# the image and passes its tag here.
+# End-to-end test of the action entrypoint against a fixture workspace:
+# converts .mmd/.mermaid/.md sources (mirroring nested paths), removes
+# orphaned SVGs, and fails on output collisions. Run via `./convert.sh smoke`,
+# which installs the pinned dependencies first.
 
 # The single-quoted backticks in the Markdown fixtures are literal fences,
 # not command substitutions.
@@ -11,14 +11,13 @@
 
 set -euo pipefail
 
-IMAGE_TAG="${1:?usage: smoke-test.sh <image-tag>}"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 WORKSPACE="$(mktemp -d)"
 trap 'rm -rf "$WORKSPACE"' EXIT
 
 run_action() {
-  docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
-    -v "$WORKSPACE":/github/workspace -w /github/workspace "$IMAGE_TAG"
+  (cd "$WORKSPACE" && node "$REPO_ROOT/src/main.mjs")
 }
 
 fail() { echo "FAIL: $1" >&2; exit 1; }

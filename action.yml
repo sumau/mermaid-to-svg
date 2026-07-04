@@ -16,18 +16,27 @@ inputs:
     required: false
     default: 'mermaid/generated'
   config:
-    description: 'Optional path to a Mermaid config JSON, passed to mmdc -c. Empty means mermaid-cli defaults.'
+    description: 'Optional path to a Mermaid config JSON. Empty means mermaid-cli defaults.'
     required: false
     default: ''
 
 runs:
-  using: 'docker'
-  # Prebuilt by the Release workflow, so consumers pull instead of building.
-  # The moving :v1 image tag is updated alongside the v1 git tag on release.
-  # Local development never uses this reference — convert.sh and the smoke
-  # test build the Dockerfile directly.
-  image: 'docker://ghcr.io/sumau/mermaid-to-svg:v1'
-  env:
-    SOURCE_DIR: ${{ inputs.source-dir }}
-    OUTPUT_DIR: ${{ inputs.output-dir }}
-    CONFIG: ${{ inputs.config }}
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    # The lockfile pins mermaid-cli and puppeteer (and via puppeteer, the
+    # Chrome build), so conversions stay reproducible across runs.
+    - name: Install mermaid-cli
+      shell: bash
+      run: cd "$GITHUB_ACTION_PATH" && npm ci
+
+    - name: Convert Mermaid to SVG
+      shell: bash
+      env:
+        SOURCE_DIR: ${{ inputs.source-dir }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+        CONFIG: ${{ inputs.config }}
+      run: node "$GITHUB_ACTION_PATH/src/main.mjs"

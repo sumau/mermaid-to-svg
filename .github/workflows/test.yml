@@ -25,13 +25,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # The runner's Node is enough for the unit tests; no image build needed.
+      # The runner's Node is enough for the unit tests; no dependencies needed.
       - name: Unit tests
         run: npm test
 
-      # Builds the action image and exercises it end-to-end against a fixture
-      # tree: conversion, Markdown extraction, orphan cleanup, collision guard.
-      # This is what tests the container end-to-end, since action.yml points
-      # at the prebuilt GHCR image rather than the local Dockerfile.
+      # Installs the pinned dependencies and exercises the entrypoint
+      # end-to-end against a fixture tree: conversion, Markdown extraction,
+      # orphan cleanup, collision guard.
       - name: Smoke test
         run: ./convert.sh smoke

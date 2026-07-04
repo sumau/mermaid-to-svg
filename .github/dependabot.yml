@@ -1,7 +1,7 @@
-# Keep the pinned mermaid-cli base image and workflow actions up to date.
+# Keep the pinned mermaid-cli/puppeteer and workflow actions up to date.
 version: 2
 updates:
-  - package-ecosystem: docker
+  - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
