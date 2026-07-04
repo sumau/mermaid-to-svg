@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Runs the working tree's action itself — the exact code path consumers
       # get, since the composite action installs from this repo's lockfile.
