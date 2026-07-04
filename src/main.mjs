@@ -74,7 +74,10 @@ if (collisions.length > 0) {
 const mermaidConfig = CONFIG ? JSON.parse(readFileSync(CONFIG, "utf8")) : undefined;
 
 // One browser serves every diagram; renderMermaid never closes a caller's browser.
-const browser = await puppeteer.launch();
+// --no-sandbox: GitHub's Ubuntu 24 runners block Chrome's sandbox (AppArmor
+// restricts unprivileged user namespaces); the old Docker action ran with the
+// same flag via its puppeteer-config.json.
+const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
 try {
   for (const rel of sources) {
     const srcPath = join(SOURCE_DIR, rel);
