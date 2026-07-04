@@ -1,11 +1,11 @@
 // Action entrypoint: convert every Mermaid source under $SOURCE_DIR to an SVG
-// under $OUTPUT_DIR, using the mermaid-cli tooling baked into this image. Runs
-// inside the container with the consumer's repo mounted at the working
-// directory. Configured via env (set from the action's inputs):
+// under $OUTPUT_DIR, using the mermaid-cli Node API. Runs with the consumer's
+// repo as the working directory. Configured via env (set from the action's
+// inputs):
 //
 //   SOURCE_DIR  Mermaid sources (.mmd, .mermaid, .md)   [default mermaid/source]
 //   OUTPUT_DIR  where SVGs are written                  [default mermaid/generated]
-//   CONFIG      Mermaid config JSON for mmdc -c          [optional]
+//   CONFIG      Mermaid config JSON                      [optional]
 //
 // It extracts the first mermaid block from each Markdown source, converts every
 // source to SVG (failing on output-name collisions), then drops SVGs whose
@@ -15,7 +15,6 @@
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -23,20 +22,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { tmpdir } from "node:os";
-import { spawnSync } from "node:child_process";
+import { renderMermaid } from "@mermaid-js/mermaid-cli";
+import puppeteer from "puppeteer";
 import { extractFirstMermaid } from "./extract-mermaid.mjs";
 import { findCollisions, findOrphans, isSource, outputPathFor } from "./plan.mjs";
 
 const SOURCE_DIR = process.env.SOURCE_DIR || "mermaid/source";
 const OUTPUT_DIR = process.env.OUTPUT_DIR || "mermaid/generated";
 const CONFIG = process.env.CONFIG || "";
-
-// mmdc isn't on PATH in the base image, and the -p puppeteer config that the
-// base ENTRYPOINT normally supplies is lost now that we override it — so name
-// both explicitly.
-const MMDC = process.env.MMDC || "/home/mermaidcli/node_modules/.bin/mmdc";
-const PUPPETEER_CONFIG = process.env.PUPPETEER_CONFIG || "/puppeteer-config.json";
 
 // Relative paths of all files under root, sorted.
 function listFiles(root) {
@@ -56,20 +49,6 @@ function removeEmptyDirs(dir) {
     if (entry.isDirectory()) removeEmptyDirs(join(dir, entry.name));
   }
   if (readdirSync(dir).length === 0) rmdirSync(dir);
-}
-
-function mmdc(input, output, srcPath) {
-  const args = ["-p", PUPPETEER_CONFIG, "-i", input, "-o", output];
-  if (CONFIG) args.unshift("-c", CONFIG);
-  const result = spawnSync(MMDC, args, { stdio: "inherit" });
-  if (result.error) {
-    console.log(`::error file=${srcPath}::Failed to run mmdc: ${result.error.message}`);
-    process.exit(1);
-  }
-  if (result.status !== 0) {
-    console.log(`::error file=${srcPath}::mmdc failed to convert ${srcPath} (exit ${result.status}); see log above.`);
-    process.exit(result.status ?? 1);
-  }
 }
 
 if (!existsSync(SOURCE_DIR)) {
@@ -92,23 +71,23 @@ if (collisions.length > 0) {
   process.exit(1);
 }
 
-// Markdown sources convert via a temp .mmd holding their first mermaid block.
-const tempDir = mkdtempSync(join(tmpdir(), "mermaid-to-svg-"));
+const mermaidConfig = CONFIG ? JSON.parse(readFileSync(CONFIG, "utf8")) : undefined;
+
+// One browser serves every diagram; renderMermaid never closes a caller's browser.
+const browser = await puppeteer.launch();
 try {
   for (const rel of sources) {
     const srcPath = join(SOURCE_DIR, rel);
-    let input = srcPath;
+    let definition = readFileSync(srcPath, "utf8");
 
     if (rel.endsWith(".md")) {
-      const { block, count } = extractFirstMermaid(readFileSync(srcPath, "utf8"));
+      const { block, count } = extractFirstMermaid(definition);
       if (block === null || block.trim() === "") {
         console.log(`::warning file=${srcPath}::No mermaid block found in ${srcPath}; skipping.`);
         continue;
       }
-      input = join(tempDir, rel.replace(/\.md$/, ".mmd"));
-      mkdirSync(dirname(input), { recursive: true });
-      writeFileSync(input, block.endsWith("\n") ? block : `${block}\n`);
-      console.log(`Extracted mermaid block from ${srcPath} -> ${input}`);
+      definition = block;
+      console.log(`Extracted mermaid block from ${srcPath}`);
       if (count > 1) {
         console.log(`::warning file=${srcPath}::Found ${count} mermaid blocks; only the first was extracted.`);
       }
@@ -116,11 +95,19 @@ try {
 
     const output = join(OUTPUT_DIR, outputPathFor(rel));
     mkdirSync(dirname(output), { recursive: true });
-    console.log(`Converting ${input} -> ${output}`);
-    mmdc(input, output, srcPath);
+    console.log(`Converting ${srcPath} -> ${output}`);
+    try {
+      const { data } = await renderMermaid(browser, definition, "svg", { mermaidConfig });
+      writeFileSync(output, data);
+    } catch (err) {
+      console.error(err);
+      const firstLine = String(err.message ?? err).split("\n")[0];
+      console.log(`::error file=${srcPath}::Failed to convert ${srcPath}: ${firstLine}`);
+      process.exit(1);
+    }
   }
 } finally {
-  rmSync(tempDir, { recursive: true, force: true });
+  await browser.close();
 }
 
 if (existsSync(OUTPUT_DIR)) {

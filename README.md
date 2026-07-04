@@ -45,8 +45,8 @@ jobs:
           }
 ```
 
-The action runs a prebuilt image from GHCR, so your workflow doesn't pay for
-an image build.
+The action installs a pinned [mermaid-cli](https://github.com/mermaid-js/mermaid-cli)
+via npm — no Docker involved, so it works on any runner with Node available.
 
 Then reference the generated SVG from anywhere:
 
@@ -60,7 +60,7 @@ Then reference the generated SVG from anywhere:
 | ------------ | ------------------- | ------------------------------------------------------ |
 | `source-dir` | `mermaid/source`    | Directory containing Mermaid sources.                  |
 | `output-dir` | `mermaid/generated` | Directory the SVGs are written to (mirrors sources).   |
-| `config`     | *(none)*            | Optional path to a Mermaid config JSON (`mmdc -c`).    |
+| `config`     | *(none)*            | Optional path to a Mermaid config JSON.                |
 
 ## Supported source formats
 
@@ -84,10 +84,10 @@ Then reference the generated SVG from anywhere:
 
 ## Developing
 
-- `action.yml`, `Dockerfile` — the action. `action.yml` points at the prebuilt
-  GHCR image, so `uses: ./` pulls the released image rather than testing local
-  changes — the smoke test is what exercises the working tree.
-- `src/` — all logic. `main.mjs` is the container entrypoint (I/O and mmdc
+- `action.yml` — a composite action: it runs `npm ci` against this repo's
+  lockfile (pinning mermaid-cli, puppeteer, and via puppeteer the Chrome
+  build), then runs the entrypoint. `uses: ./` exercises the working tree.
+- `src/` — all logic. `main.mjs` is the entrypoint (I/O and mermaid-cli
   orchestration only); `plan.mjs` holds the pure path-mapping, collision, and
   orphan decisions. Keep new decision logic there so it stays unit-testable.
 - `test/` — unit tests plus the end-to-end smoke test.
@@ -95,11 +95,14 @@ Then reference the generated SVG from anywhere:
   them and commits the SVGs back on every branch, so PRs show the generated
   SVG diff — keep those diffs visible, they're a review aid.
 
-Run `./convert.sh` to convert the examples exactly as CI does; it builds the
-action image locally, so the only dependency is Docker. Before pushing:
+Run `./convert.sh` to convert the examples with the same pinned mermaid-cli
+CI uses; the only dependency is Node ≥ 18.19. Exact SVG geometry can differ
+slightly across machines (text metrics come from local fonts) — don't commit
+locally regenerated examples; `convert-examples.yml` commits the canonical CI
+rendering back on push. Before pushing:
 
-- `npm test` — unit tests (or `./convert.sh test` to run them in Docker)
-- `./convert.sh smoke` — end-to-end test of the image against a fixture tree
+- `npm test` — unit tests
+- `./convert.sh smoke` — end-to-end test against a fixture tree
 - `shellcheck convert.sh test/smoke-test.sh` — CI lints these
 
 The commit-back snippet in the Usage example and `convert-examples.yml` are
@@ -108,10 +111,9 @@ near-duplicates; keep them in step if either changes.
 ## Releasing
 
 Run the **Release** workflow from the Actions tab with a semver like `1.0.0`.
-It pushes the image to GHCR (`:1.0.0` and `:v1`), creates the tag and GitHub
-Release, and force-moves the `v1` tag consumers pin. Don't move `v1` by hand:
-`action.yml` at `v1` must match an image that exists on GHCR. Marketplace
-listing, if wanted, is a manual step on the Release page.
+It creates the `v1.0.0` tag and GitHub Release, and force-moves the `v1` tag
+consumers pin. Marketplace listing, if wanted, is a manual step on the
+Release page.
 
 ## License
 

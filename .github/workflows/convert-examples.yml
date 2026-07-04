@@ -8,8 +8,9 @@ on:
     paths:
       - "examples/**"
       - "src/**"
-      - "Dockerfile"
-      - "convert.sh"
+      - "action.yml"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/convert-examples.yml"
   workflow_dispatch:
 
@@ -30,11 +31,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Builds the local Dockerfile and converts with it — same path as local
-      # previews, and it exercises the working tree rather than the released
-      # image action.yml points at.
+      # Runs the working tree's action itself — the exact code path consumers
+      # get, since the composite action installs from this repo's lockfile.
       - name: Convert Mermaid to SVG
-        run: ./convert.sh
+        uses: ./
+        with:
+          source-dir: examples/mermaid/source
+          output-dir: examples/mermaid/generated
+          config: examples/mermaid/config.json
 
       - name: Commit generated SVGs if changed
         run: |
