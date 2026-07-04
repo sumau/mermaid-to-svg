@@ -6,7 +6,7 @@ repo. It installs a pinned
 [mermaid-cli](https://github.com/mermaid-js/mermaid-cli) via npm — no Docker —
 so it works on any runner with Node available.
 
-![Example flowchart rendered by this action](examples/mermaid/generated/flowchart.svg)
+<img src="examples/mermaid/generated/flowchart.svg" alt="Example flowchart rendered by this action" width="350">
 
 *This image is embedded straight from
 [`examples/mermaid/generated/`](examples/mermaid/generated), where this repo's
