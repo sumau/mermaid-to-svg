@@ -2,7 +2,16 @@
 
 A GitHub Action that converts [Mermaid](https://mermaid.js.org/) diagram sources
 to SVG — so you can author a diagram once and embed it across any file in your
-repo.
+repo. It installs a pinned
+[mermaid-cli](https://github.com/mermaid-js/mermaid-cli) via npm — no Docker —
+so it works on any runner with Node available.
+
+![Example flowchart rendered by this action](examples/mermaid/generated/flowchart.svg)
+
+*This image is embedded straight from
+[`examples/mermaid/generated/`](examples/mermaid/generated), where this repo's
+own CI keeps it in sync with
+[its source](examples/mermaid/source/flowchart.mermaid).*
 
 ## The problem
 
@@ -45,8 +54,9 @@ jobs:
           }
 ```
 
-The action installs a pinned [mermaid-cli](https://github.com/mermaid-js/mermaid-cli)
-via npm — no Docker involved, so it works on any runner with Node available.
+> **Note:** this snippet commits SVGs back to your branch, so pull after the
+> Action runs before pushing again, or your next push will be rejected as
+> non-fast-forward.
 
 Then reference the generated SVG from anywhere:
 
@@ -62,7 +72,7 @@ Then reference the generated SVG from anywhere:
 | `output-dir` | `mermaid/generated` | Directory the SVGs are written to (mirrors sources).   |
 | `config`     | *(none)*            | Optional path to a Mermaid config JSON.                |
 
-## Supported source formats
+## Behavior
 
 | Extension  | Behaviour                                             |
 | ---------- | ----------------------------------------------------- |
@@ -70,17 +80,11 @@ Then reference the generated SVG from anywhere:
 | `.mermaid` | Converted directly.                                   |
 | `.md`      | The **first** ` ```mermaid ` block is extracted and converted — one diagram per page, one predictable SVG name. Extra blocks are skipped, with a warning in the Actions log. |
 
-## What it handles
-
 - **Orphan cleanup** — deletes generated SVGs whose source no longer exists.
 - **Collision guard** — fails the run if two sources would produce the same SVG
   (e.g. `diagram.mmd` and `diagram.md`), so nothing is silently clobbered.
 - **Diagram-less Markdown** — a `.md` source with no ` ```mermaid ` block is
   skipped with a warning in the Actions log, not treated as an error.
-
-> **Note:** the example above commits SVGs back to your branch, so pull after
-> the Action runs before pushing again, or your next push will be rejected as
-> non-fast-forward.
 
 ## Developing
 
