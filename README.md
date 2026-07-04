@@ -80,6 +80,11 @@ Then reference the generated SVG from anywhere:
 | `.mermaid` | Converted directly.                                   |
 | `.md`      | The **first** ` ```mermaid ` block is extracted and converted — one diagram per page, one predictable SVG name. Extra blocks are skipped, with a warning in the Actions log. |
 
+`.md` sources give the best authoring experience: GitHub renders the
+` ```mermaid ` block inline when you view the page, so you can preview the
+diagram in the GitHub UI while the action turns the same block into an SVG
+for embedding everywhere else.
+
 - **Orphan cleanup** — deletes generated SVGs whose source no longer exists.
 - **Collision guard** — fails the run if two sources would produce the same SVG
   (e.g. `diagram.mmd` and `diagram.md`), so nothing is silently clobbered.
@@ -93,7 +98,9 @@ Then reference the generated SVG from anywhere:
   build), then runs the entrypoint. `uses: ./` exercises the working tree.
 - `src/` — all logic. `main.mjs` is the entrypoint (I/O and mermaid-cli
   orchestration only); `plan.mjs` holds the pure path-mapping, collision, and
-  orphan decisions. Keep new decision logic there so it stays unit-testable.
+  orphan decisions; `extract-mermaid.mjs` pulls the first ` ```mermaid ` block
+  out of Markdown sources (its header explains the design). Keep new decision
+  logic in `plan.mjs` so it stays unit-testable.
 - `test/` — unit tests plus the end-to-end smoke test.
 - `examples/` — this repo's own diagrams. `convert-examples.yml` regenerates
   them and commits the SVGs back on every branch, so PRs show the generated
